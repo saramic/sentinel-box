@@ -160,6 +160,28 @@ WS2812B LED strip (small)       | Visual feedback on unlock state, honeypot anim
 LiPo battery + TP4056 charger   | Portable power so moving it doesn't mean it dies
 Tactile buttons (x3-4)          | Manual admin reset, pairing mode, honeypot button
 
+### Purchase list
+
+- ✅ [Digikey: MAX32630FTHR](https://www.digikey.com.au/en/products/detail/analog-devices-inc-maxim-integrated/MAX32630FTHR/6575544) $61
+- ✅ [Digikey: AdaFruit 4690 fingerprint sensor](https://www.digikey.com.au/en/products/detail/adafruit-industries-llc/4690/13170958) $30
+  - or
+  - [AliExpress: R307 finger print sensor](https://www.aliexpress.com/item/32815391770.html) $16
+- [Digikey: AdaFruit 364 NFC evaluation board](https://www.digikey.com.au/en/products/detail/adafruit-industries-llc/364/6238001) $44
+  - or
+  - [AliExpress: PN532 NFC Arduino board](https://www.aliexpress.com/item/1005006837891461.html) $13/4pcs
+- [Digikey: DFRobot DFR0119-0 Eval board for PAM8403 Amp](https://www.digikey.com.au/en/products/detail/dfrobot/DFR0119-O/13978501) $7
+  - or
+  - [AliExpress: PAM8403 Audio Amp](https://www.aliexpress.com/item/1005010021895446.html) $3/10pcs
+- [AliExpress: TTP223 Touch Sensor](https://www.aliexpress.com/item/1005006087171183.html) $9/70pcs
+- [AliExpress: OV2640 Camera Module 2MP Megapixel](https://www.aliexpress.com/item/33046344720.html) $8
+
+and related-ish
+
+- [AliExpress: AD8317 RF Signal Power Meter](https://www.aliexpress.com/item/1005009041453030.html) $10
+- ✅ [DigiKey: DRV2605L eval board (haptic driver)](https://www.digikey.com.au/en/products/detail/adafruit-industries-llc/2305/5356831) $9
+- ✅ [DigiKey: Vibrating Motor](https://www.digikey.com.au/en/products/detail/olimex-ltd/VIBRATING-MOTOR/21661954) $1
+- ✅ [DigiKey: IRLML6344 N channel MOSFET](https://www.digikey.com.au/en/products/detail/infineon-technologies/IRLML6344TRPBF/2538152) $1
+
 ### On Box mechanisms
 
 - valut like mechanism
