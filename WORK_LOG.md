@@ -1,5 +1,20 @@
 # Work Log
 
+## Thu 16 Apr 2026
+
+Seems there are a lot of write ups on how to program the **MAX32630FTHR**. I
+think I will attempt to use VSCode and Platform.io but in reality a `make`
+script with a command line build would be preferable. Some information here
+
+- **GitHub: analogdevicesinc/msdk** Software Development Kit for Analog
+  Device's MAX-series microcontrollers
+  - [https://github.com/analogdevicesinc/msdk?tab=readme-ov-file](
+    https://github.com/analogdevicesinc/msdk?tab=readme-ov-file)
+
+- how to setup MSDK for commandline
+  - [https://analogdevicesinc.github.io/msdk//USERGUIDE/#getting-started-with-command-line-development](
+    https://analogdevicesinc.github.io/msdk//USERGUIDE/#getting-started-with-command-line-development)
+
 ## Mon 13 Apr 2026
 
 I don't have a **MAX32630FTHR** but I do have other options to get started
