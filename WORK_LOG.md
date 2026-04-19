@@ -1,5 +1,49 @@
 # Work Log
 
+## Sun 19 Apr 2026
+
+### Start blogging
+
+setup jekyll and Github pages for https://saramic.github.io/sentinel-box/
+
+install ruby
+
+```sh
+# attempt mise self update
+mise self-update
+# mise ERROR mise is installed via a package manager, cannot update
+
+# realise I isntalled it via homebrew, hence
+brew update mise
+
+# list the local rubies
+mise list ruby
+
+# and all sources
+mise list --all-sources ruby
+
+# finally worked out to list remote ones
+mise ls-remote ruby
+
+# and install the latest 4.0.2
+mise install ruby 4.0.2
+mise use ruby@4.0.2
+```
+
+install jekyll following [https://jekyllrb.com/docs/](
+https://jekyllrb.com/docs/)
+
+```sh
+gem install jekyll bundler
+jekyll new docs
+
+# run it
+mise run dev-blog
+```
+
+but will ruby 4 and jekyll 4.4 run on github pages? do I need the [github-pages
+GEM](https://github.com/github/pages-gem)?
+
 ## Thu 16 Apr 2026
 
 Seems there are a lot of write ups on how to program the **MAX32630FTHR**. I

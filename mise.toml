@@ -1,0 +1,19 @@
+[vars]
+tty_blue = "\\033[%sm;34"
+tty_yellow="\\033[%sm;33"
+tty_green = "\\033[%sm;32"
+tty_red = "\\033[%sm;31"
+tty_bold = "\\033[%sm;39"
+tty_reset = "\\033[%sm;0"
+
+[tasks."dev-blog"]
+description = "run Jekyll dev blog - https://saramic.github.io/sentinel-box/"
+run = """
+	pushd docs && \
+		bundle && \
+		bundle exec jekyll serve && \
+		popd
+"""
+
+[tools]
+ruby = "4.0.2"
