@@ -2,6 +2,20 @@
 
 ## Sun 19 Apr 2026
 
+### Setup project
+
+```sh
+brew install platformio
+# and dependencies
+brew install certifi python@3.14
+```
+
+setup a PlatformIO project
+
+```sh
+platformio project init
+```
+
 ### Start blogging
 
 setup jekyll and Github pages for https://saramic.github.io/sentinel-box/
@@ -147,7 +161,7 @@ index e3aabcb..e1f68a7 100644
  plugins:
    - jekyll-feed
 +  - jekyll-remote-theme
-
+ 
  # Exclude from processing.
  # The following items will not be processed, by default.
 ```
