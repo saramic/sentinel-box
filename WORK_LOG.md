@@ -44,6 +44,65 @@ mise run dev-blog
 but will ruby 4 and jekyll 4.4 run on github pages? do I need the [github-pages
 GEM](https://github.com/github/pages-gem)?
 
+and configuring the `main` branch and `./docs` directory to be a **Pages** via
+[https://github.com/saramic/sentinel-box/settings/pages](
+https://github.com/saramic/sentinel-box/settings/pages)
+
+**NO**
+
+That only exposes the site and does not actually execute **Jekyll** to build
+it. Attempting to add the `github-page` gem blows up wit
+
+```less
+bundle add github-pages
+[DEPRECATED] Platform :mingw, :x64_mingw, :mswin will be removed in the future. Please use platform :windows instead.
+Fetching gem metadata from https://rubygems.org/.........
+Resolving dependencies...
+Could not find compatible versions
+
+    Because github-pages >= 135, < 178 depends on minima = 2.1.1
+      and github-pages >= 44, < 147 depends on liquid = 3.0.6,
+      github-pages >= 44, < 178 requires minima = 2.1.1 or liquid = 3.0.6.
+(1) So, because github-pages >= 178 depends on jekyll-sass-converter = 1.5.2
+      and github-pages >= 28, < 44 depends on jekyll = 2.4.0,
+      github-pages >= 28 requires minima = 2.1.1 or liquid = 3.0.6 or jekyll-sass-converter = 1.5.2 or jekyll = 2.4.0.
+
+    Because github-pages >= 9, < 14 depends on kramdown = 1.2.0
+      and github-pages < 9 depends on kramdown = 1.0.2,
+      github-pages < 14 requires kramdown = 1.0.2 OR = 1.2.0.
+    And because github-pages >= 14, < 32 depends on kramdown = 1.3.1,
+      github-pages < 32 requires kramdown = 1.0.2 OR = 1.2.0 OR = 1.3.1.
+    And because github-pages >= 28 requires minima = 2.1.1 or liquid = 3.0.6 or jekyll-sass-converter = 1.5.2 or jekyll = 2.4.0 (1),
+      one of minima = 2.1.1 or liquid = 3.0.6 or jekyll-sass-converter = 1.5.2 or jekyll = 2.4.0 or kramdown = 1.0.2 OR = 1.2.0 OR = 1.3.1 must be true.
+    And because jekyll >= 4.3.0 depends on jekyll-sass-converter >= 2.0, < 4.0,
+      jekyll >= 4.3.0 requires minima = 2.1.1 or liquid = 3.0.6 or kramdown = 1.0.2 OR = 1.2.0 OR = 1.3.1.
+    And because jekyll >= 4.3.0 depends on kramdown >= 2.3.1, < 3.A
+      and jekyll >= 3.5.0 depends on liquid ~> 4.0,
+      jekyll >= 4.3.0 requires minima = 2.1.1.
+    So, because Gemfile depends on jekyll ~> 4.4.1
+      and Gemfile depends on minima ~> 2.5,
+      version solving has failed.
+```
+
+at this point, I'm just going to go back to what I know works
+
+```sh
+# downgrade to a ruby that should work
+mise use ruby@3.2.2
+gem install jekyll bundler
+
+# re-create jekyll docs blog
+rm -rf docs
+jekyll new docs
+
+# add required gems github-pages AND webrick
+cd docs
+bundle add github-pages
+bundle add webrick
+
+# check jekyll works locally
+```
+
 ## Thu 16 Apr 2026
 
 Seems there are a lot of write ups on how to program the **MAX32630FTHR**. I
