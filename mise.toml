@@ -19,6 +19,12 @@ run = """
         popd
 """
 
+[tasks.build]
+description = "build"
+run = """
+    pio run -e in_blink_mbed 
+"""
+
 [tasks.upload]
 description = "upload firmware using OpenOCD"
 run = """
@@ -26,8 +32,9 @@ run = """
         -s /opt/homebrew/bin/../share/openocd/scripts \
         -f interface/cmsis-dap.cfg \
         -f target/max3263x.cfg \
-        -c "program .pio/build/max32630fthr/firmware.elf verify reset exit"
+        -c "program .pio/build/in_blink_mbed/firmware.elf verify reset exit"
 """
 
 [tools]
 ruby = "3.2.2"
+python = "3.11"

@@ -9,8 +9,8 @@ brew "mise"                   # Polyglot runtime manager (asdf rust clone)
 #
 # Embedded tooling
 #
-brew "platformio"             # Your Gateway to Embedded Software Development
-                              # Excellence https://platformio.org/
+# brew "platformio"             # Your Gateway to Embedded Software Development
+#                               # Excellence https://platformio.org/
 
 # brew "open-ocd"               # On-chip debugging, in-system programming and
 #                               # boundary-scan testing https://openocd.org/
@@ -31,10 +31,10 @@ brew "platformio"             # Your Gateway to Embedded Software Development
 brew "certifi"                # Mozilla CA bundle for Python
                               # https://github.com/certifi/python-certifi
 
-brew "python@3.14"            # Interpreted, interactive, object-oriented
-                              # programming language https://www.python.org/
-                              # /opt/homebrew/bin/python3 Unversioned symlinks
-                              # `python`, `python-config`, `pip` etc. pointing
-                              # to `python3`, `python3-config`, `pip3` etc.,
-                              # respectively, are installed into
-                              # /opt/homebrew/opt/python@3.14/libexec/bin
+# brew "python@3.14"            # Interpreted, interactive, object-oriented
+#                               # programming language https://www.python.org/
+#                               # /opt/homebrew/bin/python3 Unversioned symlinks
+#                               # `python`, `python-config`, `pip` etc. pointing
+#                               # to `python3`, `python3-config`, `pip3` etc.,
+#                               # respectively, are installed into
+#                               # /opt/homebrew/opt/python@3.14/libexec/bin

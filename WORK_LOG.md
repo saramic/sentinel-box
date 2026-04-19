@@ -95,6 +95,33 @@ Download:
     https://www.analog.com/en/resources/evaluation-hardware-and-software/embedded-development-software/software-download.html?swpart=SFW0018610B)
     - sign up for an account
 
+Back in just using the manually built and installed openocd
+
+I decided to move my experiments into `./experiments` folder this caused an
+issue with the command line `pio` (platformio) program finding the wrong python
+`python@3.14` from homebrew and the `framework-mbed` is too old. The
+recommendation was to brew uninstall platformio and use mise to install a
+specific python and pip to install platformio
+
+```sh
+brew uninstall platformio
+brew uninstall --ignore-dependencies python@3.14
+
+mise use python@3.11
+pip install platformio
+
+# now
+which pio
+$USER/.local/share/mise/installs/python/3.11/bin/pio
+```
+
+Now the whole thing is a bit more `mise` dirven
+
+```sh
+mise run build
+mise run upload
+```
+
 ### Start blogging
 
 setup jekyll and Github pages for https://saramic.github.io/sentinel-box/
