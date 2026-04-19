@@ -16,6 +16,85 @@ setup a PlatformIO project
 platformio project init
 ```
 
+```sh
+# in PlatformIO searching for 32630
+# and clicking link
+# https://docs.platformio.org/en/latest/boards/maxim32/max32630fthr.html
+# add to platform.ini
+[env:max32630fthr]
+platform = maxim32
+board = max32630fthr
+```
+
+Following [Forum Thread 2 EchoGuard – MAX32630FTHR Setup & First Blink Program Upload - Nidhee](
+https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56852/forum-thread-2-echoguard-max32630fthr-setup-first-blink-program-upload)
+
+```sh
+brew install open-ocd
+
+# find the board
+find $(dirname $(which openocd))/../share/openocd/scripts -name "max3263*.cfg"
+/opt/homebrew/bin/../share/openocd/scripts/target/max3263x.cfg
+
+# and update the platform.ini
+[env:max32630fthr]
+platform = maxim32
+board = max32630fthr
+
+framework = mbed ; or arduino depending on your preference
+
+upload_protocol = custom
+upload_command = openocd
+
+debug_tool = cmsis-dap
+```
+
+Seems to do a full compile each time and ultimately the open-ocd upload fails
+
+Trying from source
+
+```sh
+git clone https://github.com/analogdevicesinc/openocd --depth 1
+rm -rf openocd/.git
+cd openocd
+
+brew install autoconf automake libtool pkg-config libusb hidapi
+brew install jimtcl
+
+./bootstrap
+
+# ./configure --enable-cmsis-dap
+# ./configure --enable-cmsis-dap --with-jimtcl-static
+# ./configure --enable-cmsis-dap --disable-xds110
+./configure --enable-cmsis-dap --disable-xds110 \
+  CFLAGS="-g -O2 -Wno-error=gnu-folding-constant"
+
+make -j$(sysctl -n hw.ncpu)
+sudo make install
+```
+
+which installs it to
+
+```sh
+which openocd
+/usr/local/bin/openocd
+```
+
+should probably follow the instructions on Analog Devices site
+- [https://analogdevicesinc.github.io/msdk//USERGUIDE/#completing-the-installation-on-macos](
+  https://analogdevicesinc.github.io/msdk//USERGUIDE/#completing-the-installation-on-macos)
+
+```sh
+brew install libusb-compat libftdi hidapi libusb
+```
+
+Download:
+- [https://analogdevicesinc.github.io/msdk//USERGUIDE/#download](
+  https://analogdevicesinc.github.io/msdk//USERGUIDE/#download)
+  - [https://www.analog.com/en/resources/evaluation-hardware-and-software/embedded-development-software/software-download.html?swpart=SFW0018610B](
+    https://www.analog.com/en/resources/evaluation-hardware-and-software/embedded-development-software/software-download.html?swpart=SFW0018610B)
+    - sign up for an account
+
 ### Start blogging
 
 setup jekyll and Github pages for https://saramic.github.io/sentinel-box/
@@ -161,7 +240,7 @@ index e3aabcb..e1f68a7 100644
  plugins:
    - jekyll-feed
 +  - jekyll-remote-theme
- 
+
  # Exclude from processing.
  # The following items will not be processed, by default.
 ```
@@ -380,5 +459,5 @@ and related-ish
   - using a bolt on the end of a servo to hook around a metal bar
   - uses Arduino
   - and a Parallax OFN, optical finger navigation, sensor as a combination
-    decoder. 
+    decoder.
     - acts like a mini track pad

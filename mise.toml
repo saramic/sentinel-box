@@ -6,13 +6,27 @@ tty_red = "\\033[%sm;31"
 tty_bold = "\\033[%sm;39"
 tty_reset = "\\033[%sm;0"
 
+[tasks.install]
+description = "install dependencies, assuming homebrew"
+run = "brew bundle --file Brewfile"
+
 [tasks."dev-blog"]
 description = "run Jekyll dev blog - https://saramic.github.io/sentinel-box/"
 run = """
-	pushd docs && \
-		bundle && \
-		bundle exec jekyll serve && \
-		popd
+    pushd docs && \
+        bundle && \
+        bundle exec jekyll serve && \
+        popd
+"""
+
+[tasks.upload]
+description = "upload firmware using OpenOCD"
+run = """
+    openocd \
+        -s /opt/homebrew/bin/../share/openocd/scripts \
+        -f interface/cmsis-dap.cfg \
+        -f target/max3263x.cfg \
+        -c "program .pio/build/max32630fthr/firmware.elf verify reset exit"
 """
 
 [tools]
