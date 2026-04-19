@@ -103,6 +103,55 @@ bundle add webrick
 # check jekyll works locally
 ```
 
+seems to build but still not showing a built page in GitHub pages
+
+Also in the GHActions build, I notised a **Warning** which may allow me to
+update the version of Jekyll
+* [https://jekyllrb.com/docs/continuous-integration/github-actions/](
+  https://jekyllrb.com/docs/continuous-integration/github-actions/)
+
+Finally to decide on a better theme:
+* [https://docs.github.com/en/pages/setting-up-a-github-pages-site-with-jekyll/adding-a-theme-to-your-github-pages-site-using-jekyll](
+  https://docs.github.com/en/pages/setting-up-a-github-pages-site-with-jekyll/adding-a-theme-to-your-github-pages-site-using-jekyll)
+  - [Architect](https://pages-themes.github.io/architect/) probably a winner
+    with a clear "blue print" style
+  - [Caymen](https://pages-themes.github.io/cayman/) nice and clean and more
+    modern than the original
+  - [Hacker](https://pages-themes.github.io/hacker/) dark and in theme but
+    would need some tweaking
+  - [leap-day](https://pages-themes.github.io/leap-day/) a bit busy but with
+    tweaking could work
+  - [minima](https://jekyll.github.io/minima/) seems similar but just a little
+    nicer than the default? - but supposedly this is the default in
+    `_config.yml`
+  - Others that don't really rate:
+    [dinky](https://pages-themes.github.io/dinky/),
+    [Merlot](https://pages-themes.github.io/merlot/),
+    [Midnight](https://pages-themes.github.io/midnight/),
+    [Minimal](https://pages-themes.github.io/minimal/)
+
+attempted with the following but did not work so giving up for time being (also
+added the `assets/css/style.scss` file, leaving that as it doesn't break
+anything)
+
+```diff
+diff --git a/docs/_config.yml b/docs/_config.yml
+index e3aabcb..e1f68a7 100644
+--- a/docs/_config.yml
++++ b/docs/_config.yml
+@@ -35,8 +35,10 @@ timezone: Australia/Melbourne
+ # Build settings
+ markdown: kramdown
++# theme: minima
++remote_theme: pages-themes/architect@v0.2.0
+ plugins:
+   - jekyll-feed
++  - jekyll-remote-theme
+
+ # Exclude from processing.
+ # The following items will not be processed, by default.
+```
+
 ## Thu 16 Apr 2026
 
 Seems there are a lot of write ups on how to program the **MAX32630FTHR**. I
