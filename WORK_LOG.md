@@ -79,7 +79,7 @@ Can I write the HAL myself? is it worth it?
 > peripheral:
 >
 > Peripheral          | Effort                 | Notes
-> ====================|========================|=================================
+> --------------------|------------------------|---------------------------------
 > GPIO (Input/Output) | Done — you just did it | ~50 lines
 > SPI                 | Medium — ~200 lines    | need clock config, modes
 > I2C                 | Hard — ~300 lines      | clock stretching, error handling
