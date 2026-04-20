@@ -1,5 +1,192 @@
 # Work Log
 
+## Mon 20 Apr 2026 - late morning
+
+### Low Power ARM Micro SDK - LPSDK - Again
+
+Seems, the install didn't work correctly (I was using the newer MSDK without MAX32360 support). Following the steps again
+
+  - https://www.analog.com/en/products/max32630.html
+  - [Low Power ARM Micro SDK (Mac) 1.2.0](
+    https://www.analog.com/en/resources/evaluation-hardware-and-software/embedded-development-software/software-download.html?swpart=SFW0001660A)
+    - login
+    - **`ARMCortexToolhchain.dmg`**
+
+```sh
+# check the firmware is there
+ls $HOME/Maxim/Firmware/ && \
+  echo "---" && \
+  find $HOME/Maxim/Firmware -maxdepth 3 -name "*3263*" | \
+  head -20
+
+MAX32520 MAX32600 MAX32620 MAX32625 MAX3263X MAX32650 MAX32660 MAX32665
+---
+/Users/michael/Maxim/Firmware/MAX3263X
+/Users/michael/Maxim/Firmware/MAX3263X/Libraries/MAX3263XPeriphDriver
+```
+
+## Mon 20 Apr 2026 - morning
+
+### Why not Rust?
+
+With a bit of help from AI I got [./experiments/in_blink_rust/src/main.rs](
+./experiments/in_blink_rust/src/main.rs] up and running with
+
+```sh
+cd experiments/in_blink_rust
+cargo build --release
+mise run upload:in_blink_rust
+```
+
+but there was a bunch of HAL (Hardware Abstraction Layer) that is missing which meant the code requires some raw register pocking like `0x4000_A000 + 0x0080`
+
+```rust
+// raw register poke
+(0x4000_A000 + 0x0080 + port * 4) as *mut u32).write_volatile(...)
+```
+
+The reality is
+
+> **The problem:** to use any of those drivers you need a HAL crate that
+> implements `embedded-hal` for the `MAX32630`'s `SPI/I2C/UART` peripherals. No
+> such `HAL` exists. So before touching a fingerprint reader you'd need to write
+> raw register drivers for `I2C` or `SPI` — the same kind of work you just did
+> for `GPIO`, but more complex.
+>
+> **The real issue is the chip, not the language.** The MAX32630 has:
+>
+> * mbed EOL in June
+> * No MSDK support
+> * No Rust HAL
+>
+> If you switched to a chip with a Rust HAL you'd get the full ecosystem for
+> free. Best options:
+>
+> - RP2040 (`rp-hal`) — largest hobbyist Rust embedded community, cheap
+> - STM32 (`stm32f4xx-hal` etc.) — mature, huge peripheral driver library
+> - nRF52840 (`nrf-hal`) — if you need BLE
+>
+> If you're committed to the `MAX32630`, Rust is still viable but you're writing
+> every peripheral driver yourself from register access up.
+
+Can I write the HAL myself? is it worth it?
+
+> **How hard to write for MAX32630:**
+>
+> The register definitions are the easy part — `wez/max32630` on **GitHub**
+> already generated a `PAC` from the `SVD`, so the typed register access exists.
+> Building a **HAL** on top means implementing embedded-hal traits for each
+> peripheral:
+>
+> Peripheral          | Effort                 | Notes
+> ====================|========================|=================================
+> GPIO (Input/Output) | Done — you just did it | ~50 lines
+> SPI                 | Medium — ~200 lines    | need clock config, modes
+> I2C                 | Hard — ~300 lines      | clock stretching, error handling
+> UART                | Medium                 | easier than I2C
+> Timers              | Medium                 | needed for real delays
+> ADC                 | Medium                 |
+>
+> Total realistic estimate: **2–4 weeks** of focused work to get `SPI` + `I2C` +
+> `GPIO` to a usable state — the minimum needed for your fingerprint/`NFC` use
+> case.
+>
+> It's a legitimate project (the `wez/max32630` `PAC` is a starting point), but
+> you'd essentially be building infrastructure before building your actual
+> product. For a new project that's probably not the best use of time.
+
+Well not sure about the **2-4 weeks** if it has already pretty much sorted 1/25
+of it? The bigger problem is that no one would see any benefit in it as the chip
+is pretty much marked obsolete
+
+## Mon 20 Apr 2026 - overnight
+
+### MSDK and LPSDK
+
+Decided to move off the **mbed** platform and try the **MSDK** platfrom,MAXIM
+Micro SDK, which is 6GB worth of content even without selecting Eclipse. After
+downloading the installer (see below on Sun 19 Apr - Setup project) and
+overriding Apple to open the DMG and then Open the installer, I chose to install
+it into `/usr/local/bin/MaximSDK`. Leaving it to download and install ...
+
+**6GB of MSDK** and ...
+
+Seems that the MSDK I downloaded is for "newer" `MAX32690` or `MAX78000` - I
+need the older LPSDK (Low Power SDK) to get support for the legach `MAX32360`
+
+Back to Element14 community post by [@arvindsa identity protocol - part 3](
+https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56840/identity-protocol---part-3---unboxing-and-blinking-with-maxim-lpsdk)
+
+go to
+  - https://www.analog.com/en/products/max32630.html
+  - [Low Power ARM Micro SDK (Mac) 1.2.0](
+    https://www.analog.com/en/resources/evaluation-hardware-and-software/embedded-development-software/software-download.html?swpart=SFW0001660A)
+    - login
+    - **`ARMCortexToolhchain.dmg`**
+
+running install mostly may have worked, got this error
+
+```sh
+Could not fetch archives: Downloading hash signature failed.
+Error while loading http://www.mxim.net/product/dist/max32665/com.maximintegrated.dist.max32665.toolchain/0.6.6Toolchain.7z.sha1
+```
+
+not the `MAX32360` so might be OK
+
+checking if the correct libraries are found
+
+```sh
+ls /usr/local/bin/MaximSDK/Libraries/CMSIS/Device/Maxim/ && \
+  echo "---" && \
+  ls /usr/local/bin/MaximSDK/Examples/ | \
+  grep -i "MAX326"
+
+GCC      MAX32650 MAX32660 MAX32665 MAX32672 MAX32680 MAX78000
+MAX32520 MAX32655 MAX32662 MAX32670 MAX32675 MAX32690 MAX78002
+---
+MAX32650
+MAX32655
+MAX32660
+MAX32662
+MAX32665
+MAX32670
+MAX32672
+MAX32675
+MAX32680
+MAX32690
+
+# and
+find /usr/local/bin/MaximSDK -name "*32630*" -o -name "*LPSDK*" 2>/dev/null | \
+  head -20 && \
+  echo "---" && \
+  ls /usr/local/bin/ | \
+  grep -i maxim
+
+/usr/local/bin/MaximSDK/Tools/SBT/src/build_scp_session/include/ucl/max32630_crypto.h
+/usr/local/bin/MaximSDK/Tools/SBT/src/sign_app/include/ucl/max32630_crypto.h
+---
+MaximSDK
+```
+
+from some internet searching
+
+> The LPSDK appears to have been quietly retired. All the old Maxim repos have
+> migrated to `analogdevicesinc` and the LPSDK is not there — only mbed-based
+> examples using it remain.
+>
+> **Bottom line:** The LPSDK is effectively gone. Analog Devices replaced it
+> with the MSDK which dropped MAX32630 support entirely.
+>
+> The real options for MAX32630 seem to be:
+>
+> * mbed (works now, EOL June 2026)
+> * Rust (working today, as you just proved) - see above ^^
+>
+> Sources:
+>
+> * [analogdevicesinc GitHub - MAX32630 repos](https://github.com/analogdevicesinc?q=MAX32630)
+> * [MaximIntegratedTechSupport migration notice](https://github.com/MaximIntegratedTechSupport)
+
 ## Sun 19 Apr 2026
 
 ### Setup project
