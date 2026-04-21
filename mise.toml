@@ -19,6 +19,14 @@ run = """
         popd
 """
 
+#
+# Default PlatformIO build - pio
+# currently experiments/in_blink_mbed - Mbed 🅼🅱🅴🅳
+#
+[tasks.clean]
+description = "clean"
+run = "rm -rf .pio/build"
+
 [tasks.build]
 description = "build"
 run = """
@@ -35,24 +43,76 @@ run = """
         -c "program .pio/build/in_blink_mbed/firmware.elf verify reset exit"
 """
 
-[tasks."upload:in_blink_LPSDK"]
-description = "upload blink in LPSDK firmware"
+#
+# Experiments in blink - Mbed 🅼🅱🅴🅳
+#
+[tasks."clean:in_blink_mbed"]
+description = "clean blink Mbed"
+run = "rm -rf .pio/build"
+
+[tasks."build:in_blink_mbed"]
+description = "build blink Mbed firmware"
+run = """
+    pio run -e in_blink_mbed
+"""
+
+[tasks."upload:in_blink_mbed"]
+description = "upload blink Mbed firmware"
+dir = "experiments/in_blink_mbed"
 run = """
     openocd \
         -s /usr/local/share/openocd/scripts \
         -f interface/cmsis-dap.cfg \
         -f target/max3263x.cfg \
-        -c 'program experiments/in_blink_LPSDK/build/in_blink_lpsdk.elf verify reset exit'
+        -c "program .pio/build/in_blink_mbed/firmware.elf verify reset exit"
 """
+
+#
+# Experiments in blink - LPSDK 🅲
+#
+[tasks."clean:in_blink_LPSDK"]
+description = "clean blink LPSDK"
+dir = "experiments/in_blink_LPSDK"
+run = "make clean"
+
+[tasks."build:in_blink_LPSDK"]
+description = "build blink LPSDK firmware"
+dir = "experiments/in_blink_LPSDK"
+run = "make"
+
+[tasks."upload:in_blink_LPSDK"]
+description = "upload blink in LPSDK firmware"
+dir = "experiments/in_blink_LPSDK"
+run = """
+    openocd \
+        -s /usr/local/share/openocd/scripts \
+        -f interface/cmsis-dap.cfg \
+        -f target/max3263x.cfg \
+        -c 'program build/in_blink_lpsdk.elf verify reset exit'
+"""
+
+#
+# Experiments in blink - Rust 🦀
+#
+[tasks."clean:in_blink_rust"]
+description = "clean blink rust"
+dir = "experiments/in_blink_rust"
+run = "cargo clean"
+
+[tasks."build:in_blink_rust"]
+description = "build blink rust firmware"
+dir = "experiments/in_blink_rust"
+run = ". \"$HOME/.cargo/env\" && cargo build --release"
 
 [tasks."upload:in_blink_rust"]
 description = "upload blink in rust firmware"
+dir = "experiments/in_blink_rust"
 run = """
     openocd \
         -s /usr/local/share/openocd/scripts \
         -f interface/cmsis-dap.cfg \
         -f target/max3263x.cfg \
-        -c 'program experiments/in_blink_rust/target/thumbv7em-none-eabihf/release/in_blink_rust verify reset exit'
+        -c 'program target/thumbv7em-none-eabihf/release/in_blink_rust verify reset exit'
 """
 
 [tools]
