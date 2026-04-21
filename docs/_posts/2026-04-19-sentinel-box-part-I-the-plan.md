@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Sentinel Box - Part I - the plan"
-date:   2026-04-19 12:00:00 +1000
+date:   2026-04-21 23:59:59 +1000
 categories: sentinel-box update
 ---
 
@@ -19,14 +19,16 @@ closest was the time locking container, except that once set, there is no
 override - you lock your phone in for 2 days, that's it. Also it had poor
 battery life and not big enough to fit a laptop or block of chocolate.
 
-**TODO** add picture of time locking container and stack of things to lock
+![Example of a time locking container next to a stash of things to lock but,
+the container is too small and the batteries have run
+out](/sentinel-box/assets/20260421_01_timer_lock_box.jpg)
 
 The Smart **Sentinel Box** is a Perspex vault that physically locks devices
 inside, and can only be opened by a "complex" and orchestrated process of more
 than one party. The key is that it can be opened, just that more than one
 person needs to make that decision, someone with opening rights. The
 orchestrated part just means I can add more elaborate mechanisms as I learn to
-work with the **MAX32360FTHR**. Simple ones first — a button, finger print
+work with the **MAX32630FTHR**. Simple ones first — a button, finger print
 reader, a tap pattern — escalating to genuinely absurd ones: an audio quiz
 streamed from a cloud lambda, a TOTP NFC card that expires every 30 seconds,
 requiring both parents' fingerprints simultaneously, or a GPS geofence that
@@ -44,14 +46,14 @@ around it.
 
 I was not lucky enought to get selected for a sponsored pack, but as I am new to
 the Element14 Design Challenge community, I didn't want to give up that easy. I
-placed an order and the **MAX32360** arrived. As I was waiting I was intriguted
+placed an order and the **MAX32630** arrived. As I was waiting I was intriguted
 by all the not so triviall posts on the setup required to program the
-**MAX32360**. It seems that the platform is already EOL (End of life). I
+**MAX32630**. It seems that the platform is already EOL (End of life). I
 thought:
 
 - **1** ⚠️ no USB-C port
 - **2** ⚠️ platform is EOL
-  - [Analog Devices MAX32360](https://www.analog.com/en/products/max32630.html)
+  - [Analog Devices MAX32630](https://www.analog.com/en/products/max32630.html)
   - **NOT RECOMMENDED FOR NEW DESIGNS**
   - created almost 10 years ago - 2018 Maxim Integrated Products, Inc.
 
@@ -74,7 +76,7 @@ connected to **VSCode**.
   - [Programming the MAX32630FTHR with the Arduino IDE - Alistair](
     https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56838/programming-the-max32630fthr-with-the-arduino-ide-don-t-forget-to-set)
 
-As the **MAX32360** arrived, I had to get down to program it. I started with
+As the **MAX32630** arrived, I had to get down to program it. I started with
 **PlatformIO** in VSCode as that has been my goto for Arduino and ESP32
 projects. After a bit of pain, I could build it but I had no idea how to
 upload? there was a seperate board for that? Going back to the Element14
@@ -142,9 +144,9 @@ given it's EOL status I wasn't satisfied.
 ## Maxim SDK
 
 So next I was onto MSDK (Maxim which I worked out has dropped support for the
-MAX32360.
+MAX32630.
 
-- **5** ⚠️ current MSDK does not support MAX32**360**
+- **5** ⚠️ current MSDK does not support MAX32**630**
   - [https://developer.analog.com/solutions/msdk](
     https://developer.analog.com/solutions/msdk) support starts at the
     MAX32**650** and it seems like [**MAX78000FTHR**](
@@ -186,7 +188,7 @@ install I have a blinking LED courtesy of the article.
 Oh and this comes with, you guessed it, the correct OpenOCD in the toolchain -
 maybe I should have RTFM 📚.
 
-## Why the MAX32360?
+## Why the MAX32630?
 
 That is 6 warnings why not to build on this platform. I really wander why this
 was chosen as the central piece of the design challenge - it's not even cheaper
@@ -204,10 +206,14 @@ Did I miss a memo? Still, I bought it now, and I need to build something
 
 ## My hardware list
 
-**TODO** image with TinyML and hardware
+So I have my **MAX32630FTHR**, ontop of Tiny ML book to dream big with some
+wake word recognition. On the left some potential inputs like fingerprint
+reader, RFID, mmWave detector and on the right a motor, stepper motor and servo
+- time will tell what will come of this.
 
-
-**TODO** image of design somewhere below
+![MAX32630FTHR ontop of a Tiny ML book surrounded by RFID, Fingerprint, mmWave
+detectors and some motors for
+actuation](/sentinel-box/assets/20260421_02_parts_list.jpg)
 
 ## Hermetic Builds — Going Full Unix Purist
 
@@ -233,7 +239,7 @@ account required. No 6 GB installer required.
 > Cortex-R and other embedded processors.
 >
 > **NOTE:** `arm-none-eabi` supports C and C++ but **Rust** 🦀 is "cool" 😎
-> 
+>
 > [https://developer.arm.com/downloads/-/gnu-rm](https://developer.arm.com/downloads/-/gnu-rm)
 
 The results for a **hermetic build** with LED blink were optimistic
@@ -247,8 +253,92 @@ Platform    | build    | from scratch
 In pursuit of this zero click-ops embedded development dream — I decided to
 continue a little bit more with the **Rust** build.
 
-**TODO** can I get animated gif and some basics running for an attitude meter
-and 6 axis accelerometer?
+## Some output
 
+All projects need some input and some output. Not having a **Würth Elektronik
+Featherwing ICLED Display** I got the closes thing I had, an old **MAX7219
+serial LED dot matrix display** to the **MAX32630FTHR**. This was a brilliant
+moment, I pulled out my soldering iron and soldered on the header pins - It's
+been a while since I have melted some solder and it felt good.
+
+But before I could code something, I needed to find a bug in my Rust code. It
+didn't run after a cold strart, only after the Mbed code had run. This took me
+down a rabbit hole of looking at **MAX14690** PMIC (Power Management IC). It
+seems that my code in either the LPSDK nor the Rust was configuring that so I
+needed to write some bits and bytes in there just for it to work post power up.
+
+A bunch of vibe ٭ coding and a `pmic_init` function later and it worked. At
+this point I didn't care too much what was in there, some `I2CM` and `LDO`
+registers being set - off I go. Now I vibe some code, connect and nothing - no
+smoke 💨 which is good but finally pulling out the multimeter and checking the
+pins shows me that `3V3` ain't `3V3` 🤔 I mean I never even thought that these
+things are configurable. Well sounds like they are.
+
+as the [brochure](
+https://au.element14.com/analog-devices/max32630fthr/pegasus-dev-brd-batt-optimized/dp/2723406)
+says
+
+> The board also includes the `MAX14690` wearable `PMIC` to provide optimal
+> power conversion and battery management.
+
+Well it seems like that is configurable and following my code I realised that
+my first `pmic_init` implementation even had a comment
+
+{% highlight c %}
+// (mbed only writes LDO2; LDO3 omitted here to match the reference exactly.)
+{% endhighlight %}
+
+Guess what `LDO3` (Low Dropout Regulator) is - it's the `3V3` pin
+
+So to get an output voltage of 3.3V on the the MAX14690 PMIC's LDO (Low Dropout
+Regulator) you need to:
+
+```
+Register_value = (V_desired - V_min) / step_size
+Example: (3300 - 800) / 100 = 25
+
+25 in HEX is 0x19
+```
+
+and set it in code where
+
+- `0x16` (LDO3_CFG): Register to enable/configure LDO3.
+- `0x17` (LDO3_VSET): Register to set the output voltage for LDO3.
+
+```c
+// LDO2_VSET: (3300 - 800) / 100 = 25 = 0x19
+const LDO2_3300MV: u8 = 0x19;
+
+  ...
+
+  // LDO3 powers the expansion header 3V3 rail — needed for external
+  // peripherals.
+  pmic_write(0x17, LDO_3300MV);  // LDO3_VSET
+  pmic_write(0x16, LDO_ENABLED); // LDO3_CFG
+```
+
+<img src="/sentinel-box/assets/20260421_04_matrix_test.gif" alt="MAX32630FTHR driving a MAX7219 serial LED matrix" width="740" />
+
+Success, I have my Unix purist, hermetic build in Rust with an external
+peripheral and a whole bunch of half knowledge on PMIC and bit pushing logic I
+am pretty sure I don't need, time will tell.
+
+<video width="740" controls>
+  <source src="/sentinel-box/assets/20260421_03_matrix_test.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+## Next
+
+It may be time to give up the Rust experiment, once I set the `3V3` pin to 3.3V,
+it no longer starts my program from a cold start, oh well.
+
+Otherwise, I am pretty sure that with basic GPIO control, I can drive a stepper
+motor and similar but to get any sort of security element into this project, I
+really need to connet to something like the finger print reader I have.
+
+## Source
+
+[https://github.com/saramic/sentinel-box](https://github.com/saramic/sentinel-box)
 
 [smart-security-challenge]: https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/

@@ -1,5 +1,63 @@
 # Work Log
 
+## Tue 21 Apr 2026
+
+### Wrestling with Rust 🦀
+
+The last few days have been a blur of rust and AI. First it was some **pmic**
+(Power Management Integrated Circuit) setting that was missing. Meant that the
+blink programs I had written in both LPSDK and Rust failed to run post a cold
+start - vibe coded that away. Then it was time to connect to an LED Matrix - I
+actually got to pull out the multimeter to solder on the headers to be able to
+connect it 👨‍🏭 . As I connect it to a MAX7219 LED driver, I realise that the 3V3
+pin is not 3V3 - I think I may have overpowered the device? But vibe and AI to
+the rescue, supposedly a previous vibe sesh had not changed the voltage on the
+3V3 pin to 3V3. The comment
+
+```c
+// (mbed only writes LDO2; LDO3 omitted here to match the reference exactly.)
+```
+
+Luckly the board was OK and after some more vibing I worked out that  to set
+the voltage output (3.3V) for the MAX14690 PMIC's LDO (Low Dropout Regulator)
+you need to:
+
+$$
+V_{OUT} = V_{min} + N \times \text{step\_size}
+$$
+
+```
+Register value = (V_desired - V_min) / step_size
+Example: (3300 - 800) / 100 = 25
+
+25 in HEX is 0x19
+```
+
+```c
+// LDO2_VSET: (3300 - 800) / 100 = 25 = 0x19
+const LDO2_3300MV: u8 = 0x19;
+
+...
+
+  // LDO2 (VDDB) and LDO3 (3.3V header pin) both to 3.3V.
+  // LDO3 powers the expansion header 3V3 rail — needed for external peripherals.
+  pmic_write(0x15, LDO_3300MV);  // LDO2_VSET
+  pmic_write(0x14, LDO_ENABLED); // LDO2_CFG
+  pmic_write(0x17, LDO_3300MV);  // LDO3_VSET
+  pmic_write(0x16, LDO_ENABLED); // LDO3_CFG
+```
+
+and the `0x14 ... 0x17` etc are register addresses for the MAX14690 PMIC (Power
+Management IC). Each register controls a specific function or setting in the
+chip.
+
+Here's what they mean in this context:
+
+`0x14` (LDO2_CFG): Register to enable/configure LDO2.
+`0x15` (LDO2_VSET): Register to set the output voltage for LDO2.
+`0x16` (LDO3_CFG): Register to enable/configure LDO3.
+`0x17` (LDO3_VSET): Register to set the output voltage for LDO3.
+
 ## Mon 20 Apr 2026 - late morning
 
 ### Low Power ARM Micro SDK - LPSDK - Again
