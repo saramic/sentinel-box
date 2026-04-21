@@ -6,7 +6,7 @@ categories: sentinel-box update
 ---
 
 My first forum post for the element14 [Smart security and
-surveillance](smart-security-challenge) Design Challenge.
+surveillance][smart-security-challenge] Design Challenge.
 
 # The Idea
 
@@ -339,6 +339,7 @@ really need to connect to something like the finger print reader I have.
 
 ## Source
 
-[https://github.com/saramic/sentinel-box](https://github.com/saramic/sentinel-box)
+[https://github.com/saramic/sentinel-box][github-sentinel-box]
 
 [smart-security-challenge]: https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/
+[github-sentinel-box]: https://github.com/saramic/sentinel-box
