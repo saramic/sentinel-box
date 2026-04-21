@@ -116,6 +116,30 @@ run = """
         -c 'program target/thumbv7em-none-eabihf/release/in_blink_rust verify reset exit'
 """
 
+#
+# Experiments in attittude meter - Rust 🦀
+#
+[tasks."clean:in_attitude_meter"]
+description = "clean attitude meter"
+dir = "experiments/in_attitude_meter"
+run = "cargo clean"
+
+[tasks."build:in_attitude_meter"]
+description = "build attitude meter rust firmware"
+dir = "experiments/in_attitude_meter"
+run = ". \"$HOME/.cargo/env\" && cargo build --release"
+
+[tasks."upload:in_attitude_meter"]
+description = "upload attitude meter rust firmware"
+dir = "experiments/in_attitude_meter"
+run = """
+    openocd \
+        -s /usr/local/share/openocd/scripts \
+        -f interface/cmsis-dap.cfg \
+        -f target/max3263x.cfg \
+        -c 'program target/thumbv7em-none-eabihf/release/in_attitude_meter verify reset exit'
+"""
+
 [tools]
 ruby = "3.2.2"
 python = "3.11"
