@@ -5,6 +5,8 @@ use cortex_m::asm;
 use cortex_m_rt::entry;
 use panic_halt as _;
 
+mod pmic;
+
 // MAX32630 has a single GPIO peripheral with register arrays indexed by port.
 // Source: mbed-os TARGET_MAX32630/device/gpio_regs.h + max3263x.h
 //
@@ -27,6 +29,7 @@ const DELAY_CYCLES: u32 = 12_000_000; // ~125ms at 96 MHz
 
 #[entry]
 fn main() -> ! {
+    pmic::init();
     unsafe {
         // Set P2.4 to open-drain output (FTHR LEDs are active-low, open-drain)
         let mode = out_mode(LED_PORT).read_volatile();
