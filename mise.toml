@@ -58,7 +58,8 @@ run = """
 
 [tasks."upload:in_blink_mbed"]
 description = "upload blink Mbed firmware"
-dir = "experiments/in_blink_mbed"
+# currently can only build as default level via platform.ini
+# dir = "experiments/in_blink_mbed"
 run = """
     openocd \
         -s /usr/local/share/openocd/scripts \
