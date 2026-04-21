@@ -47,7 +47,7 @@ around it.
 I was not lucky enought to get selected for a sponsored pack, but as I am new to
 the Element14 Design Challenge community, I didn't want to give up that easy. I
 placed an order and the **MAX32630** arrived. As I was waiting I was intriguted
-by all the not so triviall posts on the setup required to program the
+by all the not so trivial posts on the setup required to program the
 **MAX32630**. It seems that the platform is already EOL (End of life). I
 thought:
 
@@ -60,7 +60,7 @@ thought:
 Too late now, dive in ... 🤿
 
 I was lucky that others had documented their setups, which seemed more
-complicated than I would like like this one by @skruglewicz
+complicated than I would like, like this one by @skruglewicz
 
 - [Forum#2 - MAX32630FTHR Dev Environments - skruglewicz](
   https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56843/forum-2---max32630fthr-development-environments---adaptive-sentinel-security-intelligence-hub)
@@ -79,7 +79,7 @@ connected to **VSCode**.
 As the **MAX32630** arrived, I had to get down to program it. I started with
 **PlatformIO** in VSCode as that has been my goto for Arduino and ESP32
 projects. After a bit of pain, I could build it but I had no idea how to
-upload? there was a seperate board for that? Going back to the Element14
+upload? there was a separate board for that? Going back to the Element14
 community saved me having to read any manuals 👍.
 
   - [Forum Thread 2 EchoGuard – MAX32630FTHR Blink - Nidhee](
@@ -113,7 +113,7 @@ git clone https://github.com/analogdevicesinc/openocd --depth 1
 rm -rf openocd/.git
 cd openocd
 
-# install some libraries requierd for building the package
+# install some libraries required for building the package
 brew install autoconf automake libtool pkg-config libusb hidapi jimtcl
 
   # UNTESTED
@@ -179,7 +179,7 @@ hardware support.
 
 ## LPSDK (Low Power ARM Micro SDK)
 
-Revisiting **LPSDK**, I worked out the install didn't intially work. Now post
+Revisiting **LPSDK**, I worked out the install didn't initially work. Now post
 install I have a blinking LED courtesy of the article.
 
 - [Identity Protocol - Part 3 - arvindsa](
@@ -190,7 +190,7 @@ maybe I should have RTFM 📚.
 
 ## Why the MAX32630?
 
-That is 6 warnings why not to build on this platform. I really wander why this
+That is 6 warnings why not to build on this platform. I really wonder why this
 was chosen as the central piece of the design challenge - it's not even cheaper
 to buy the hardware over newer revisions.
 
@@ -211,7 +211,7 @@ wake word recognition. On the left some potential inputs like fingerprint
 reader, RFID, mmWave detector and on the right a motor, stepper motor and servo
 - time will tell what will come of this.
 
-![MAX32630FTHR ontop of a Tiny ML book surrounded by RFID, Fingerprint, mmWave
+![MAX32630FTHR on top of a Tiny ML book surrounded by RFID, Fingerprint, mmWave
 detectors and some motors for
 actuation](/sentinel-box/assets/20260421_02_parts_list.jpg)
 
@@ -246,7 +246,7 @@ The results for a **hermetic build** with LED blink were optimistic
 
 Platform    | build    | from scratch
 ------------|---------:|-------------------------------------------------------
-**Mbed**    | ~ 95 sec | ? ~ 30 min<br> (_Via PlatfromIO install_)
+**Mbed**    | ~ 95 sec | ? ~ 30 min<br> (_Via PlatformIO install_)
 **LPSDK**   |  ~ 6 sec | ? ~ 60 min<br> (_LPSDK signup download and install_)
 **Rust 🦀** |  ~ 5 sec |   ~ 15 sec<br> _with clear cache_<br>`rm -rf ~/.cargo/registry ~/.cargo/git`
 
@@ -256,13 +256,13 @@ continue a little bit more with the **Rust** build.
 ## Some output
 
 All projects need some input and some output. Not having a **Würth Elektronik
-Featherwing ICLED Display** I got the closes thing I had, an old **MAX7219
+Featherwing ICLED Display** I got the closest thing I had, an old **MAX7219
 serial LED dot matrix display** to the **MAX32630FTHR**. This was a brilliant
 moment, I pulled out my soldering iron and soldered on the header pins - It's
 been a while since I have melted some solder and it felt good.
 
 But before I could code something, I needed to find a bug in my Rust code. It
-didn't run after a cold strart, only after the Mbed code had run. This took me
+didn't run after a cold start, only after the Mbed code had run. This took me
 down a rabbit hole of looking at **MAX14690** PMIC (Power Management IC). It
 seems that my code in either the LPSDK nor the Rust was configuring that so I
 needed to write some bits and bytes in there just for it to work post power up.
@@ -335,7 +335,7 @@ it no longer starts my program from a cold start, oh well.
 
 Otherwise, I am pretty sure that with basic GPIO control, I can drive a stepper
 motor and similar but to get any sort of security element into this project, I
-really need to connet to something like the finger print reader I have.
+really need to connect to something like the finger print reader I have.
 
 ## Source
 
