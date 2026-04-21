@@ -8,6 +8,12 @@ Element 14 Design Challenge
 
 SentinelBox — Intelligent Device Lockbox Powered by MAX32630FTHR
 
+## Blog
+
+[https://saramic.github.io/sentinel-box/](
+https://saramic.github.io/sentinel-box/)
+
+
 ## Project Summary
 
 SentinelBox is a smart secure storage system designed to control access to
