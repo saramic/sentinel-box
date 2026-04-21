@@ -1,5 +1,54 @@
 # Work Log
 
+## TODO Links
+
+- [ ] https://forum.arduino.cc/t/using-arduino-to-generate-quadrature-signals-for-sdr/212059/6
+- [ ] https://github.com/merbanan/rtl_433/blob/master/docs/BUILDING.md
+- [ ] https://www.crowdsupply.com/lime-micro/limesdr
+- [ ] https://www.crowdsupply.com/lime-micro/limesdr-mini
+- [ ] https://github.com/pothosware/SoapySDR/
+- [ ] https://github.com/osmocom/rtl-sdr/
+- [ ] https://forum.arduino.cc/t/using-arduino-to-generate-quadrature-signals-for-sdr/212059/5
+- [ ] https://hackaday.com/2023/01/13/arduino-library-brings-rtl_433-to-the-esp32/#:~:text=If%20you%20have%20an%20RTL,as%20much%20of%20a%20surprise.
+- [ ] The new Elektor SDR Shield for Arduino – Travelling the waves Elektor TV
+    - https://www.youtube.com/watch?v=KHdqskbfFhA&t=14s
+- [ ] New LoRa 32 V4 ESP32 SX1262 Low Power Dev-Board 0.96inch
+  OLED Supports Wi-Fi BLE LoRa communication Compatible Meshtastic
+    - https://www.aliexpress.com/item/1005010203038481.html
+- [ ] Scanning ESP32 Radar Tracks Multiple Targets in Real Time! - Circuit Helper
+    - https://www.youtube.com/watch?v=ZnkWKowQYXg
+- [ ] I made Esp32 based Radar : It has a Built-In Display - Dsn Industries
+    - https://www.youtube.com/watch?v=t4QVxeeEtEQ
+
+- [ ] official docs
+  - https://www.analog.com/en/products/max32630.html#documentation
+  - downloaded the data sheet
+  - also
+    - https://www.analog.com/media/en/reference-design-documentation/design-notes/ds147-take-a-weight-off-your-chest-with-a-wrist-worn-ecg-monitor.pdf
+    - https://www.analog.com/en/resources/design-notes/how-to-create-a-remote-medical-sensing-system-using-maxim-integrateds-iot-development-platform.html
+    - https://www.analog.com/en/resources/technical-articles/take-a-weight-off-your-chest-with-a-wristworn-ecg-monitor.html
+    - https://www.analog.com/media/en/technical-documentation/user-guides/interface-guide-for-max32664-sensor-hubbased-reference-design-platforms.pdf
+    - https://www.analog.com/media/en/technical-documentation/user-guides/max32630-users-guide.pdf
+
+- another competition from 2017
+- [ ] https://www.allaboutcircuits.com/giveaways/get-creative-makewithmaxim-design-contest/
+     - https://forum.allaboutcircuits.com/ubs/makewithmaxim-vr-glove.970/
+     - https://forum.allaboutcircuits.com/ubs/pelvic-sensor.968/
+     - https://forum.allaboutcircuits.com/ubs/makewithmaxim-maxbot-a-low-cost-robotic-kit.975/
+     - https://forum.allaboutcircuits.com/ubs/max32630fthr-as-a-vr-controller-makewithmaxim.966/
+     - https://forum.allaboutcircuits.com/ubs/fitness-wearable.980/
+     - https://forum.allaboutcircuits.com/ubs/hygromax-630-made-with-maxim-final-submission.989/
+     - https://forum.allaboutcircuits.com/ubs/impact-sensor.979/
+     - https://forum.allaboutcircuits.com/ubs/autonomous-quadcopter.987/
+     - https://forum.allaboutcircuits.com/ubs/makewithmaxim-sciencesensorhub.988/
+     - https://forum.allaboutcircuits.com/ubs/max32630fthr-wearable-ekg.990/
+     - https://forum.allaboutcircuits.com/ubs/makewithmaxim-model-rocket-data-acquisition-and-telemetry.976/
+
+- [ ] Digikey schematics
+  - https://www.digikey.com/en/schemeit/project/max32630fthr-pegasus-board-TS7G7N03027G
+
+---
+
 ## Tue 21 Apr 2026
 
 ### Wrestling with Rust 🦀
