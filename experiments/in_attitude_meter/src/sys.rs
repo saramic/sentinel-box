@@ -19,7 +19,7 @@
 // Source: LPSDK system_max3263x.c (mbed TARGET_MAX32630 device driver).
 
 // CLKMAN — base 0x4000_0400
-const CLKMAN_CLK_CTRL: *mut u32 = 0x4000_0404 as *mut u32; // offset 0x0004
+const CLKMAN_CLK_CTRL: *mut u32 = 0x4000_0400 as *mut u32; // offset 0x0000
 
 // TRIM (factory calibration info block) — base 0x4000_1000
 const TRIM_PWR_REG5: *const u32 = 0x4000_1034 as *const u32; // offset 0x0034
