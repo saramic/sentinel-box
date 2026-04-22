@@ -49,6 +49,109 @@
 
 ---
 
+## Wed 24 Apr 2026
+
+### experiments in attitude meter 🛩️ 🧭
+
+Made a reasonable LED matrix "artificial horizon" with scrolling velocity
+feedback using the onboard `BMI160` intertial measurement unit and an external
+LED matrix display powered by a MAX7219 serial display driver.
+
+The core logic is in the [./experiments/in_attitude_meter/src/main.rs](
+./experiments/in_attitude_meter/src/main.rs) file.
+
+```rust
+    loop {
+        // Get the X and Y acceleration
+        let ax = bmi160::read_accel_x();
+        let ay = bmi160::read_accel_y();
+
+        // ay drives velocity: tilt makes bar scroll, urging user to counter-tilt
+        // 2^15 = 32,768
+        // Sensitivity = 16384 LSB/g (1g = 16384 counts)
+        // by ay / 32768.0 we normalizes to ±1.0 where ±1.0 = ±2g (full scale).
+        let velocity = -(ay as f32) / 32768.0;
+        let next = bar_pos + velocity;
+        let r = next % 8.0;
+        bar_pos = if r < 0.0 { r + 8.0 } else { r };
+
+        // ax tilts the bar diagonally: ±3.5 rows across 8 columns at max tilt
+        let slope = (ax as f32) / 32768.0 * 3.5;
+
+        let mut rows = [0u8; 8];
+        for col in 0..8u32 {
+            let col_pos = bar_pos + slope * (col as f32 - 3.5);
+            let r = col_pos % 8.0;
+            let wrapped = if r < 0.0 { r + 8.0 } else { r };
+            let row = ((wrapped + 0.5) as usize) % 8;
+            rows[row] |= 1 << col;
+        }
+
+        display.clear();
+        for (i, &mask) in rows.iter().enumerate() {
+            if mask != 0 {
+                display.write_reg((i + 1) as u8, mask);
+            }
+        }
+
+        // Refresh every ~10ms assuming 96 Mhz clock
+        asm::delay(960_000); // ~10 ms
+    }
+```
+
+based on the BMI160 data sheet
+- [https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmi160-ds000.pdf](
+  https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmi160-ds000.pdf)
+
+1. Two I2C transactions per frame (easy fix)
+read_accel_x() does a 2-byte read, read_accel_y() does a separate 6-byte read —
+two transactions. read_accel_y() already reads all 6 bytes and discards X and
+Z. One function reading all 6 at once and returning a struct would halve your
+I2C traffic.
+
+2. Z axis — already in your buffer, thrown away
+The 6 bytes at REG_ACC_X_LSB give X, Y, Z in order. buf[4..5] = Z (vertical
+when flat). Z lets you detect if the board is nearly flat vs steeply tilted,
+and x²+y²+z² ≈ 16384² is a vibration/free-fall check.
+
+3. Gyroscope — completely unused
+The chip has a full 3-axis gyroscope — currently in suspend. Wake it with
+CMD_GYR_NORMAL = 0x15 (startup takes 55 ms). Gyro data is at registers
+0x0C–0x11 (same 6-byte pattern as accel). At default ±2000°/s range,
+sensitivity = 16.4 LSB/°/s.
+
+For the attitude meter this is the biggest win: gyro gives angular rate
+(rotation speed in °/s), which doesn't noise-up with vibration. A simple
+complementary filter blends them:
+
+angle = 0.98 × (angle + gyro_rate × dt) + 0.02 × accel_angle
+This gives stable, smooth tilt — gyro handles fast motion, accel corrects slow
+drift.
+
+4. ACC_CONF (0x40) — ODR not set explicitly
+Your loop runs at ~5 ms (200 Hz) but the default accelerometer ODR is 100 Hz
+(acc_odr=8). You're reading stale data half the time. Write 0x29 to ACC_CONF to
+set 200 Hz, or 0x2A for 400 Hz.
+
+5. Fast Offset Compensation — one-shot hardware calibration
+From §2.9.1: a built-in calibration sequence removes mounting bias. With the
+board held flat, write FOC_CONF (0x69) then issue start_foc to the CMD register
+(0x7E). Takes ≤250 ms, then writes trim values into the OFFSET registers
+(0x71–0x77) automatically. The accuracy is 3.9 mg. Can be saved to NVM (≤14
+write cycles lifetime). This would zero out any bias so "level" truly reads
+ax=0, ay=0.
+
+6. Temperature sensor — free when gyro is active
+Registers 0x20–0x21, 16-bit, 0.002°C/LSB, centre at 23°C. No extra init. Useful
+for knowing if thermal drift is affecting readings.
+
+Priority    | Change                                    | Benefit
+------------|-------------------------------------------|----------------------
+1           | Single burst read for X+Y+Z               | Efficiency + Z axis
+2           | Set ACC_CONF ODR to 200 Hz                | No stale reads
+3           | Enable gyroscope + complementary filter   | Smooth stable attitude
+4           | FOC calibration at startup                | True zero at level
+
 ## Wed 23 Apr 2026
 
 ### 6 Axis acceleromenter and an attitude meter in Rust 🦀

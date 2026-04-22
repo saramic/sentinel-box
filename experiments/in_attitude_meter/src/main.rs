@@ -57,20 +57,42 @@ fn main() -> ! {
     display.write_reg(2, intfl_pre);
     display.write_reg(3, chip_id_post);
     display.write_reg(4, intfl_post);
-    asm::delay(288_000_000); // ~3 s
+    asm::delay(288_000_000); // ~3 s at 96 MHz
 
     display.clear();
+
+    // row 4 (0-indexed) = row 5 from top: level position
+    let mut bar_pos: f32 = 4.0;
 
     loop {
         let ax = bmi160::read_accel_x();
         let ay = bmi160::read_accel_y();
 
-        let row_x = (2i32 - (ax as i32 / 8192)).clamp(1, 4) as u8;
-        let row_y = (6i32 - (ay as i32 / 8192)).clamp(5, 8) as u8;
-        display.clear();
-        display.write_reg(row_x, 0xFF);
-        display.write_reg(row_y, 0xFF);
+        // ay drives velocity: tilt makes bar scroll, urging user to counter-tilt
+        let velocity = -(ay as f32) / 32768.0;
+        let next = bar_pos + velocity;
+        let r = next % 8.0;
+        bar_pos = if r < 0.0 { r + 8.0 } else { r };
 
-        asm::delay(9_600_000); // ~100 ms
+        // ax tilts the bar diagonally: ±3.5 rows across 8 columns at max tilt
+        let slope = (ax as f32) / 32768.0 * 3.5;
+
+        let mut rows = [0u8; 8];
+        for col in 0..8u32 {
+            let col_pos = bar_pos + slope * (col as f32 - 3.5);
+            let r = col_pos % 8.0;
+            let wrapped = if r < 0.0 { r + 8.0 } else { r };
+            let row = ((wrapped + 0.5) as usize) % 8;
+            rows[row] |= 1 << col;
+        }
+
+        display.clear();
+        for (i, &mask) in rows.iter().enumerate() {
+            if mask != 0 {
+                display.write_reg((i + 1) as u8, mask);
+            }
+        }
+
+        asm::delay(960_000); // ~10 ms
     }
 }
