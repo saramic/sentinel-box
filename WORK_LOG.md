@@ -53,6 +53,28 @@
 
 ### 6 Axis acceleromenter and an attitude meter in Rust 🦀
 
+The 6 Axis acccelerometer inside the MAX32630FTHR can be used for a balance bot
+- https://www.hackster.io/justin-jordan/max32630fthr-balance-bot-621f0f
+
+- **MAX32630FTHR Balance Bot - Justin Jordan**
+
+  [![
+    MAX32630FTHR Balance Bot - Justin Jordan
+  ](
+    http://img.youtube.com/vi/Uu7QbEvHTG8/0.jpg
+  )](https://youtu.be/Uu7QbEvHTG8)
+
+- **MAX32630FTHR Balance Bot part 2 - Justin Jordan**
+
+  [![
+    MAX32630FTHR Balance Bot part 2 - Justin Jordan
+  ](
+    http://img.youtube.com/vi/A3T340ZXMZY/0.jpg
+  )](https://youtu.be/A3T340ZXMZY)
+
+most of the code has been downloaded into
+[./reference/MAX32630FTHR_balance_bot_code](reference/MAX32630FTHR_balance_bot_code)
+
 TODO
 
 ## Tue 22 Apr 2026
