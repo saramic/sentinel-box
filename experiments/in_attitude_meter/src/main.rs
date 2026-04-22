@@ -8,6 +8,7 @@ use panic_halt as _;
 mod gpio;
 mod max7219;
 mod pmic;
+mod sys;
 
 use gpio::Pin;
 use max7219::Max7219;
@@ -24,7 +25,11 @@ const DELAY_CYCLES: u32 = 12_000_000; // ~125 ms at 96 MHz
 
 #[entry]
 fn main() -> ! {
+    sys::init();
     pmic::init();
+    // LDO3 (3V3 rail) just came up — give MAX7219 time to complete power-on reset.
+    // On warm restart LDO3 was already on so this is a no-op cost; cold boot needs it.
+    cortex_m::asm::delay(9_600_000); // ~100 ms at 96 MHz
 
     let mut display = Max7219::new(
         Pin::push_pull(DIN_PORT, DIN_PIN),
@@ -32,6 +37,12 @@ fn main() -> ! {
         Pin::push_pull(CLK_PORT, CLK_PIN),
     );
     display.init();
+
+    // Display test: all LEDs on for 1 second, then normal operation.
+    // If the matrix lights up here, SPI wiring is correct.
+    display.write_reg(0x0F, 0x01); // display test on
+    asm::delay(96_000_000);        // ~1 s
+    display.write_reg(0x0F, 0x00); // display test off
 
     loop {
         // Sweep horizontal bars row 1..8

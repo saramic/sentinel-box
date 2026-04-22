@@ -119,6 +119,20 @@ run = """
 #
 # Experiments in attittude meter - Rust 🦀
 #
+[tasks."cbu:in_attitude_meter"]
+description = "clean-build-upload attitude meter"
+# TODO: is there a way to run these one after the other
+# depends = [
+#   "clean:in_attitude_meter",
+#   "build:in_attitude_meter",
+#   "upload:in_attitude_meter",
+# ]
+run = """
+  mise run clean:in_attitude_meter
+  mise run build:in_attitude_meter
+  mise run upload:in_attitude_meter
+"""
+
 [tasks."clean:in_attitude_meter"]
 description = "clean attitude meter"
 dir = "experiments/in_attitude_meter"

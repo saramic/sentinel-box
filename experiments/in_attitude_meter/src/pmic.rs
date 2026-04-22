@@ -67,6 +67,10 @@ unsafe fn pmic_init() {
 
     // LDO2 (VDDB) and LDO3 (3.3V header pin) both to 3.3V.
     // LDO3 powers the expansion header 3V3 rail — needed for external peripherals.
+    // NOTE: there was a thought that the LDO2 (VDDB) core supply should settle for
+    //         cortex_m::asm::delay(960_000); // ~10 ms at 96 MHz — let VDDB settle
+    //       before enabling LDO3, but empirically it seems to be fine to enable
+    //       them back-to-back.
     pmic_write(0x15, LDO_3300MV);  // LDO2_VSET
     pmic_write(0x14, LDO_ENABLED); // LDO2_CFG
     pmic_write(0x17, LDO_3300MV);  // LDO3_VSET

@@ -49,6 +49,116 @@
 
 ---
 
+## Wed 23 Apr 2026
+
+### 6 Axis acceleromenter and an attitude meter in Rust 🦀
+
+TODO
+
+## Tue 22 Apr 2026
+
+### Cold restart working with Rust 🦀
+
+Two terms that kept coming up:
+
+- **POR** (Power-On Reset) — what happens when power is physically applied to
+  the chip. Every register resets to its factory default. Nothing is remembered
+  from any previous run.
+- **SWD** (Serial Wire Debug) — the two-wire interface (SWDIO + SWDCLK) used
+  by OpenOCD and DAPLink to program and debug ARM Cortex-M chips. An SWD reset
+  is a software-triggered reset through the debug interface. **Crucially, SWD
+  reset is not the same as POR** — many peripheral registers survive an SWD
+  reset.
+
+This distinction is exactly why the Rust firmware always worked after
+`mise run upload:in_attitude_meter` (which ends with an SWD reset) but failed
+on cold restart (POR): the previous mbed or LPSDK run had configured certain
+registers, and those values survived the SWD reset but were wiped on POR.
+
+Three things were needed to fix cold boot:
+
+#### 1. `sys::init()` — clock, oscillator trim, flash controller
+
+A new `experiments/in_attitude_meter/src/sys.rs` replicating what the LPSDK
+does in `PreInit()` and `SystemInit()` (source:
+`~/.platformio/packages/framework-mbed/targets/TARGET_Maxim/TARGET_MAX32630/device/system_max3263x.c`).
+
+The `cortex_m_rt` crate used by Rust does generic ARM Cortex-M startup only —
+it copies `.data`, zeroes `.bss`, and calls `main()`. It knows nothing about
+the MAX32630's chip-specific initialisation. Three things go wrong after a POR
+without it:
+
+- **Clock source** — `CLKMAN_CLK_CTRL = 0x1` at `0x4000_0404` explicitly
+  selects the 96 MHz ring oscillator. Without it the chip may run at half speed
+  or an undefined frequency. (`PreInit()` in the LPSDK.)
+
+- **Oscillator trim** — factory calibration values live in the device INFO
+  block at `TRIM_PWR_REG5/6` (`0x4000_1034` / `0x4000_1038`). They must be
+  copied to the power sequencer at `PWRSEQ_REG5/6` (`0x4000_0814` /
+  `0x4000_0818`) on every POR, because those registers lose state on a full
+  power cycle but survive an SWD reset. Without the correct trim the 96 MHz
+  oscillator is uncalibrated and unstable — I2C and delay timing become
+  unreliable. (`SystemInit()` in the LPSDK.)
+
+- **Flash `AUTO_CLKDIV`** — `FLC_PERFORM |= 0x3701_0000` at `0x4000_2050`
+  lets the flash controller derive its own clock divider automatically.
+  OpenOCD configures this during programming (which is why warm restart always
+  worked), but it resets on POR. (`SystemInit()` in the LPSDK.)
+
+```rust
+// sys.rs — called as the very first line of main()
+unsafe fn sys_init() {
+    CLKMAN_CLK_CTRL.write_volatile(0x0000_0001);          // 96 MHz RO
+    // copy trim from INFO block → PWRSEQ (oscillator calibration)
+    let trim5 = TRIM_PWR_REG5.read_volatile();
+    let trim6 = TRIM_PWR_REG6.read_volatile();
+    if (FLC_CTRL.read_volatile() & (1 << 25)) != 0
+        && trim5 != 0xFFFF_FFFF && trim6 != 0xFFFF_FFFF
+    {
+        PWRSEQ_REG5.write_volatile(trim5);
+        PWRSEQ_REG6.write_volatile(trim6);
+    } else {
+        let r6 = PWRSEQ_REG6.read_volatile();
+        PWRSEQ_REG6.write_volatile((r6 & !0x01FF_0000) | (0x1E0 << 16));
+    }
+    let p = FLC_PERFORM.read_volatile();
+    FLC_PERFORM.write_volatile(p | 0x3701_0000);          // AUTO_CLKDIV etc.
+}
+```
+
+#### 2. `pmic.rs` — enable LDO3 as well as LDO2
+
+The original mbed reference (`low_level_init.c`) only writes LDO2 because
+that's the minimum needed for the MCU to run. LDO3 powers the expansion header
+3V3 rail — the MAX7219 is wired there. The LPSDK `Board_Init` writes both (see
+`experiments/in_blink_LPSDK/main.c`).
+
+```rust
+pmic_write(0x15, LDO_3300MV);  // LDO2_VSET — core supply
+pmic_write(0x14, LDO_ENABLED); // LDO2_CFG
+pmic_write(0x17, LDO_3300MV);  // LDO3_VSET — 3V3 header rail
+pmic_write(0x16, LDO_ENABLED); // LDO3_CFG
+```
+
+No delay between LDO2 and LDO3 is needed (tested and confirmed).
+
+#### 3. 100 ms delay after `pmic::init()` before touching the MAX7219
+
+LDO3 comes up inside `pmic::init()` on cold boot. The MAX7219 needs to
+complete its own internal power-on reset sequence before it will accept SPI
+commands. On warm restart LDO3 was already on, so the chip was already up and
+this made no difference. On cold boot, hitting the MAX7219 immediately after
+`pmic::init()` returns meant the init commands were silently ignored and the
+chip stayed in shutdown.
+
+```rust
+sys::init();
+pmic::init();
+cortex_m::asm::delay(9_600_000); // ~100 ms — let MAX7219 complete POR
+let mut display = Max7219::new(...);
+display.init();
+```
+
 ## Tue 21 Apr 2026
 
 ### Wrestling with Rust 🦀
