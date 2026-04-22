@@ -64,23 +64,18 @@ pub fn read_chip_id() -> u8 {
     }
 }
 
-/// Read raw X-axis acceleration. Returns signed 16-bit value.
-pub fn read_accel_x() -> i16 {
-    unsafe {
-        let mut buf = [0u8; 2];
-        i2cm2_read_bytes(REG_ACC_X_LSB, &mut buf);
-        i16::from_le_bytes([buf[0], buf[1]])
-    }
-}
-
-/// Read raw Y-axis acceleration (forward/back pitch per balance bot reference).
-/// Returns signed 16-bit value: ±16384 LSB ≈ ±1 g (default ±2 g range).
-pub fn read_accel_y() -> i16 {
+/// Read all three acceleration axes in a single 6-byte burst.
+/// Returns (ax, ay, az): signed 16-bit values, ±16384 LSB ≈ ±1 g at default ±2 g range.
+pub fn read_accel_xyz() -> (i16, i16, i16) {
     unsafe {
         let mut buf = [0u8; 6];
         i2cm2_read_bytes(REG_ACC_X_LSB, &mut buf);
         // buf layout: [X_L, X_H, Y_L, Y_H, Z_L, Z_H]
-        i16::from_le_bytes([buf[2], buf[3]])
+        (
+            i16::from_le_bytes([buf[0], buf[1]]),
+            i16::from_le_bytes([buf[2], buf[3]]),
+            i16::from_le_bytes([buf[4], buf[5]]),
+        )
     }
 }
 

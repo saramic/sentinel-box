@@ -65,8 +65,7 @@ fn main() -> ! {
     let mut bar_pos: f32 = 4.0;
 
     loop {
-        let ax = bmi160::read_accel_x();
-        let ay = bmi160::read_accel_y();
+        let (ax, ay, _az) = bmi160::read_accel_xyz();
 
         // ay drives velocity: tilt makes bar scroll, urging user to counter-tilt
         let velocity = -(ay as f32) / 32768.0;
