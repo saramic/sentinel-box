@@ -48,7 +48,9 @@ fn main() -> ! {
     let chip_id_pre  = bmi160::read_chip_id();
     let intfl_pre    = bmi160::read_intfl() as u8;
 
-    bmi160::acc_init();
+    // sample bmi160 at 200 Hz and align this with the delay in the loop
+    let odr = bmi160::AccOdr::Hz200;
+    bmi160::acc_init(odr);
 
     let chip_id_post = bmi160::read_chip_id();
     let intfl_post   = bmi160::read_intfl() as u8;
@@ -92,6 +94,7 @@ fn main() -> ! {
             }
         }
 
-        asm::delay(960_000); // ~10 ms
+        // aligned with the bmi160 sample rate
+        asm::delay(odr.delay_cycles());
     }
 }

@@ -29,24 +29,52 @@ const BMI160_READ:  u16 = 0xD1; // 0x68 << 1 | 1
 
 // BMI160 register addresses
 const REG_CMD:       u8 = 0x7E;
+const REG_ACC_CONF:  u8 = 0x40; // acc_us[7] | acc_bwp[6:4] | acc_odr[3:0]
 const REG_ACC_X_LSB: u8 = 0x12; // 6 bytes: X_L X_H Y_L Y_H Z_L Z_H
 
 // BMI160 power mode commands (CMD register)
 const CMD_ACC_NORMAL: u8 = 0x11;
 
-/// No I2CM hardware init needed — pmic::init() already set up I2CM2.
-pub fn hw_init() {}
+// Accelerometer output data rate. Each variant encodes the full ACC_CONF byte:
+// acc_us=0, acc_bwp=0b010 (normal filter), acc_odr per datasheet table.
+// Formula: ODR Hz = 100 / 2^(8 - acc_odr)
+#[allow(dead_code)]
+#[derive(Copy, Clone)]
+pub enum AccOdr {
+    Hz25   = 0x26,
+    Hz50   = 0x27,
+    Hz100  = 0x28,
+    Hz200  = 0x29,
+    Hz400  = 0x2A,
+    Hz800  = 0x2B,
+    Hz1600 = 0x2C,
+}
 
-/// Send CMD_ACC_NORMAL to wake the accelerometer from suspend mode.
-pub fn acc_init() {
-    unsafe {
-        i2cm2_write(REG_CMD, CMD_ACC_NORMAL);
-        cortex_m::asm::delay(480_000); // ~5 ms startup per BMI160 datasheet
+impl AccOdr {
+    // Cycles for asm::delay matching one sample period at 96 MHz.
+    pub fn delay_cycles(self) -> u32 {
+        match self {
+            AccOdr::Hz25   => 3_840_000,
+            AccOdr::Hz50   => 1_920_000,
+            AccOdr::Hz100  =>   960_000,
+            AccOdr::Hz200  =>   480_000,
+            AccOdr::Hz400  =>   240_000,
+            AccOdr::Hz800  =>   120_000,
+            AccOdr::Hz1600 =>    60_000,
+        }
     }
 }
 
-pub fn init() {
-    acc_init();
+/// No I2CM hardware init needed — pmic::init() already set up I2CM2.
+pub fn hw_init() {}
+
+// Wake the accelerometer and set the output data rate.
+pub fn acc_init(odr: AccOdr) {
+    unsafe {
+        i2cm2_write(REG_CMD, CMD_ACC_NORMAL);
+        cortex_m::asm::delay(480_000); // ~5 ms startup per BMI160 datasheet
+        i2cm2_write(REG_ACC_CONF, odr as u8);
+    }
 }
 
 /// Return raw INTFL register — call immediately after a transaction, before the next one.
