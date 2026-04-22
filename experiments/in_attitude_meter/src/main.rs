@@ -5,6 +5,7 @@ use cortex_m::asm;
 use cortex_m_rt::entry;
 use panic_halt as _;
 
+mod bmi160;
 mod gpio;
 mod max7219;
 mod pmic;
@@ -21,8 +22,6 @@ const CLK_PIN: u32 = 1;
 const CS_PORT: u32 = 3;
 const CS_PIN: u32 = 2;
 
-const DELAY_CYCLES: u32 = 12_000_000; // ~125 ms at 96 MHz
-
 #[entry]
 fn main() -> ! {
     sys::init();
@@ -38,23 +37,40 @@ fn main() -> ! {
     );
     display.init();
 
-    // Display test: all LEDs on for 1 second, then normal operation.
-    // If the matrix lights up here, SPI wiring is correct.
-    display.write_reg(0x0F, 0x01); // display test on
-    asm::delay(96_000_000);        // ~1 s
-    display.write_reg(0x0F, 0x00); // display test off
+    // --- Diagnostic phase (4 rows, 3 seconds) ---
+    // Row 1: chip ID before ACC_NORMAL write  → expect 0xD1 (●●·●···●)
+    // Row 2: INTFL after that read            → expect TX_DONE, no NACK/RX_UND
+    // Row 3: chip ID after  ACC_NORMAL write  → expect 0xD1 still
+    // Row 4: INTFL after CMD write            → expect TX_DONE
+
+    bmi160::hw_init();
+
+    let chip_id_pre  = bmi160::read_chip_id();
+    let intfl_pre    = bmi160::read_intfl() as u8;
+
+    bmi160::acc_init();
+
+    let chip_id_post = bmi160::read_chip_id();
+    let intfl_post   = bmi160::read_intfl() as u8;
+
+    display.write_reg(1, chip_id_pre);
+    display.write_reg(2, intfl_pre);
+    display.write_reg(3, chip_id_post);
+    display.write_reg(4, intfl_post);
+    asm::delay(288_000_000); // ~3 s
+
+    display.clear();
 
     loop {
-        // Sweep horizontal bars row 1..8
-        for row in 1..=8u8 {
-            display.horizontal_bar(row);
-            asm::delay(DELAY_CYCLES);
-        }
+        let ax = bmi160::read_accel_x();
+        let ay = bmi160::read_accel_y();
 
-        // Sweep vertical bars col 0..7
-        for col in 0..8u8 {
-            display.vertical_bar(col);
-            asm::delay(DELAY_CYCLES);
-        }
+        let row_x = (2i32 - (ax as i32 / 8192)).clamp(1, 4) as u8;
+        let row_y = (6i32 - (ay as i32 / 8192)).clamp(5, 8) as u8;
+        display.clear();
+        display.write_reg(row_x, 0xFF);
+        display.write_reg(row_y, 0xFF);
+
+        asm::delay(9_600_000); // ~100 ms
     }
 }
