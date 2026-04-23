@@ -53,6 +53,11 @@
 
 ### experiments in attitude meter 🛩️ 🧭
 
+<video width="740" controls>
+  <source src="./docs/assets/20260423_01_attitude_meter.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
 Made a reasonable LED matrix "artificial horizon" with scrolling velocity
 feedback using the onboard `BMI160` intertial measurement unit and an external
 LED matrix display powered by a MAX7219 serial display driver.
