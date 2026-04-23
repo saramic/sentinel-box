@@ -40,6 +40,7 @@ run = """
         -s /usr/local/share/openocd/scripts \
         -f interface/cmsis-dap.cfg \
         -f target/max3263x.cfg \
+        -c 'reset_config srst_only' \
         -c "program .pio/build/in_blink_mbed/firmware.elf verify reset exit"
 """
 
@@ -65,6 +66,7 @@ run = """
         -s /usr/local/share/openocd/scripts \
         -f interface/cmsis-dap.cfg \
         -f target/max3263x.cfg \
+        -c 'reset_config srst_only' \
         -c "program .pio/build/in_blink_mbed/firmware.elf verify reset exit"
 """
 
@@ -89,6 +91,7 @@ run = """
         -s /usr/local/share/openocd/scripts \
         -f interface/cmsis-dap.cfg \
         -f target/max3263x.cfg \
+        -c 'reset_config srst_only' \
         -c 'program build/in_blink_lpsdk.elf verify reset exit'
 """
 
@@ -113,6 +116,7 @@ run = """
         -s /usr/local/share/openocd/scripts \
         -f interface/cmsis-dap.cfg \
         -f target/max3263x.cfg \
+        -c 'reset_config srst_only' \
         -c 'program target/thumbv7em-none-eabihf/release/in_blink_rust verify reset exit'
 """
 
@@ -151,6 +155,7 @@ run = """
         -s /usr/local/share/openocd/scripts \
         -f interface/cmsis-dap.cfg \
         -f target/max3263x.cfg \
+        -c 'reset_config srst_only' \
         -c 'program target/thumbv7em-none-eabihf/release/in_attitude_meter verify reset exit'
 """
 
@@ -183,6 +188,7 @@ run = """
         -s /usr/local/share/openocd/scripts \
         -f interface/cmsis-dap.cfg \
         -f target/max3263x.cfg \
+        -c 'reset_config srst_only' \
         -c 'program target/thumbv7em-none-eabihf/release/in_fingerprint_reading verify reset exit'
 """
 
