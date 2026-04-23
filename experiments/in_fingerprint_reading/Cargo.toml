@@ -1,0 +1,23 @@
+[package]
+name = "in_fingerprint_reading"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "in_fingerprint_reading"
+test = false
+bench = false
+
+[dependencies]
+cortex-m = "0.7"
+cortex-m-rt = "0.7"
+panic-halt = "0.2"
+
+[profile.release]
+opt-level = "s"
+lto = true
+debug = true
+panic = "abort"
+
+[profile.dev]
+panic = "abort"

@@ -154,6 +154,38 @@ run = """
         -c 'program target/thumbv7em-none-eabihf/release/in_attitude_meter verify reset exit'
 """
 
+#
+# Experiments in fingerprint reading - Rust 🦀
+#
+[tasks."cbu:in_fingerprint_reading"]
+description = "clean-build-upload fingerprint reading"
+run = """
+  mise run clean:in_fingerprint_reading
+  mise run build:in_fingerprint_reading
+  mise run upload:in_fingerprint_reading
+"""
+
+[tasks."clean:in_fingerprint_reading"]
+description = "clean fingerprint reading"
+dir = "experiments/in_fingerprint_reading"
+run = "cargo clean"
+
+[tasks."build:in_fingerprint_reading"]
+description = "build fingerprint reading rust firmware"
+dir = "experiments/in_fingerprint_reading"
+run = ". \"$HOME/.cargo/env\" && cargo build --release"
+
+[tasks."upload:in_fingerprint_reading"]
+description = "upload fingerprint reading rust firmware"
+dir = "experiments/in_fingerprint_reading"
+run = """
+    openocd \
+        -s /usr/local/share/openocd/scripts \
+        -f interface/cmsis-dap.cfg \
+        -f target/max3263x.cfg \
+        -c 'program target/thumbv7em-none-eabihf/release/in_fingerprint_reading verify reset exit'
+"""
+
 [tools]
 ruby = "3.2.2"
 python = "3.11"
