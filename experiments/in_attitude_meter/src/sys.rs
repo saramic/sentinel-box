@@ -33,8 +33,36 @@ const PWRSEQ_REG6: *mut u32 = 0x4000_0818 as *mut u32; // offset 0x0018
 const FLC_CTRL:    *const u32 = 0x4000_2008 as *const u32; // offset 0x0008
 const FLC_PERFORM: *mut u32   = 0x4000_2050 as *mut u32;   // offset 0x0050
 
+// DWT (Data Watchpoint and Trace) — ARM CoreSight, fixed addresses on all Cortex-M4
+const DEMCR:      *mut u32 = 0xE000_EDFC as *mut u32; // bit 24 = TRCENA, enables DWT
+const DWT_CTRL:   *mut u32 = 0xE000_1000 as *mut u32; // bit 0 = CYCCNTENA
+const DWT_CYCCNT: *mut u32 = 0xE000_1004 as *mut u32; // 32-bit cycle counter @ CPU freq
+const DWT_LAR:    *mut u32 = 0xE000_1FB0 as *mut u32; // CoreSight Lock Access Register
+
+// CPU clock frequency — Internal Relaxation Oscillator, typ 96 MHz (range 94–98 MHz).
+pub const CPU_HZ: u32 = 96_000_000;
+
 pub fn init() {
     unsafe { sys_init() }
+}
+
+/// Spin for exactly `cycles` CPU clock cycles using the DWT cycle counter.
+/// Wraps correctly at 2^32 (~44.7 s at 96 MHz) via wrapping subtraction.
+/// Falls back to a counted loop if DWT is not counting (CYCCNT stuck at 0).
+pub fn delay_cycles(cycles: u32) {
+    let start = unsafe { DWT_CYCCNT.read_volatile() };
+    // If DWT_CYCCNT is stuck (returns start on every read), the wrapping
+    // subtraction never advances and this loops forever.  Detect by checking
+    // whether the counter has moved at all after a brief spin; if not, fall
+    // back to a simple counted loop (~3 cycles/iter at 96 MHz).
+    let probe = unsafe { DWT_CYCCNT.read_volatile() };
+    if probe == start {
+        // DWT not counting — use asm::delay as fallback (calibrated via CPU_HZ).
+        // 3 cycles per iteration is typical for Cortex-M4 SUBS+BNE.
+        cortex_m::asm::delay(cycles / 3);
+        return;
+    }
+    while unsafe { DWT_CYCCNT.read_volatile() }.wrapping_sub(start) < cycles {}
 }
 
 unsafe fn sys_init() {
@@ -61,4 +89,18 @@ unsafe fn sys_init() {
     //    Bits: [16] | [24] | [28] | [29] = 0x3701_0000
     let perform = FLC_PERFORM.read_volatile();
     FLC_PERFORM.write_volatile(perform | 0x3701_0000);
+
+    // 4. Enable DWT cycle counter.
+    //    TRCENA must be set before any DWT register is accessed.
+    //    DSB+ISB ensure the write propagates through the pipeline before we proceed.
+    //    DWT_LAR unlock (key 0xC5ACCE55) is required on some implementations where
+    //    the CoreSight lock is asserted after power-on reset.
+    DEMCR.write_volatile(DEMCR.read_volatile() | (1 << 24)); // set TRCENA
+    cortex_m::asm::dsb();
+    cortex_m::asm::isb();
+    DWT_LAR.write_volatile(0xC5AC_CE55); // unlock DWT registers
+    DWT_CYCCNT.write_volatile(0);        // reset counter
+    DWT_CTRL.write_volatile(DWT_CTRL.read_volatile() | 1); // set CYCCNTENA
+    cortex_m::asm::dsb();
+    cortex_m::asm::isb();
 }

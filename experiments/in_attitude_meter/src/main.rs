@@ -1,7 +1,6 @@
 #![no_std]
 #![no_main]
 
-use cortex_m::asm;
 use cortex_m_rt::entry;
 use panic_halt as _;
 
@@ -13,13 +12,7 @@ mod sys;
 
 use gpio::Pin;
 use max7219::Max7219;
-
-// asm::delay is a SUBS+BNE loop guaranteed only to burn *at least* N iterations —
-// actual wall-clock time varies with pipeline state, cache, and flash wait states.
-// Empirically measured on this board: delay(288_000_000) ≈ 10.39 s at 96 MHz.
-// Note: RC oscillator fallback (before sys::init) runs at 4 MHz — 24× slower.
-// For authoritative timing, use the DWT cycle counter instead of asm::delay.
-const DELAY_HZ: u32 = 27_720_000; // iterations/s, board-measured not calculated
+use sys::CPU_HZ;
 
 // MAX7219 bit-bang SPI pins — P3 header on MAX32630FTHR
 const DIN_PORT: u32 = 3;
@@ -35,7 +28,7 @@ fn main() -> ! {
     pmic::init();
     // LDO3 (3V3 rail) just came up — give MAX7219 time to complete power-on reset.
     // On warm restart LDO3 was already on so this is a no-op cost; cold boot needs it.
-    cortex_m::asm::delay(DELAY_HZ / 10); // 100 ms
+    sys::delay_cycles(CPU_HZ / 10); // 100 ms
 
     let mut display = Max7219::new(
         Pin::push_pull(DIN_PORT, DIN_PIN),
@@ -66,7 +59,7 @@ fn main() -> ! {
     display.write_reg(2, intfl_pre);
     display.write_reg(3, chip_id_post);
     display.write_reg(4, intfl_post);
-    asm::delay(DELAY_HZ * 3); // 3 s
+    sys::delay_cycles(CPU_HZ * 3); // 3 s
 
     display.clear();
 
@@ -102,6 +95,6 @@ fn main() -> ! {
         }
 
         // aligned with the bmi160 sample rate
-        asm::delay(odr.delay_cycles());
+        sys::delay_cycles(odr.delay_cycles());
     }
 }

@@ -54,13 +54,13 @@ impl AccOdr {
     // Cycles for asm::delay matching one sample period at 96 MHz.
     pub fn delay_cycles(self) -> u32 {
         match self {
-            AccOdr::Hz25   => crate::DELAY_HZ / 25,
-            AccOdr::Hz50   => crate::DELAY_HZ / 50,
-            AccOdr::Hz100  => crate::DELAY_HZ / 100,
-            AccOdr::Hz200  => crate::DELAY_HZ / 200,
-            AccOdr::Hz400  => crate::DELAY_HZ / 400,
-            AccOdr::Hz800  => crate::DELAY_HZ / 800,
-            AccOdr::Hz1600 => crate::DELAY_HZ / 1600,
+            AccOdr::Hz25   => crate::sys::CPU_HZ / 25,
+            AccOdr::Hz50   => crate::sys::CPU_HZ / 50,
+            AccOdr::Hz100  => crate::sys::CPU_HZ / 100,
+            AccOdr::Hz200  => crate::sys::CPU_HZ / 200,
+            AccOdr::Hz400  => crate::sys::CPU_HZ / 400,
+            AccOdr::Hz800  => crate::sys::CPU_HZ / 800,
+            AccOdr::Hz1600 => crate::sys::CPU_HZ / 1600,
         }
     }
 }
@@ -72,7 +72,7 @@ pub fn hw_init() {}
 pub fn acc_init(odr: AccOdr) {
     unsafe {
         i2cm2_write(REG_CMD, CMD_ACC_NORMAL);
-        cortex_m::asm::delay(crate::DELAY_HZ / 200); // 5 ms startup per BMI160 datasheet
+        crate::sys::delay_cycles(crate::sys::CPU_HZ / 200); // 5 ms startup per BMI160 datasheet
         i2cm2_write(REG_ACC_CONF, odr as u8);
     }
 }
