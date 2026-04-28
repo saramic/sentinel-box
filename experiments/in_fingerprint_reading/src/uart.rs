@@ -48,20 +48,17 @@ const CTRL_8N1_FIFO_EN: u32 = 0x37;
 //   bits [7:0]  = BAUD_DIVISOR
 //   bits [9:8]  = BAUD_MODE  (0 = 128× oversampling, 2 = fractional)
 //
-// For 57600 bps at 96 MHz with BAUD_MODE=0 (128× oversampling):
-//   divisor = 96_000_000 / (57600 * 128) ≈ 13.02  → use 13 (≈0.16% error)
-//
-// TODO: verify with an oscilloscope or logic analyser on first bring-up.
-// If the sensor does not respond, try BAUD_MODE=2 (fractional divider) or
-// drop to 9600 bps (divisor = 96_000_000 / (9600 * 128) ≈ 78.1 → 78).
-// const BAUD_57600: u32 = 13; // BAUD_DIVISOR, BAUD_MODE=0
-const BAUD_57600: u32 = 78; // BAUD_DIVISOR, BAUD_MODE=0
+// Baud rate divisors for BAUD_MODE=0 (128× oversampling) at 96 MHz:
+//   divisor = 96_000_000 / (baud * 128)
+const BAUD_57600: u32 = 13; // ≈ 13.02 → 0.16% error — sensor factory default
+const BAUD_9600:  u32 = 78; // ≈ 78.13 → 0.16% error — use if sensor was reconfigured
 
 pub fn init() {
     unsafe {
         CLKMAN_SYS_CLK_CTRL_8_UART.write_volatile(1); // DIV_1 — all UARTs
         IOMAN_UART2_REQ.write_volatile(0x10);          // Map A, IO_REQ=1
-        UART2_BAUD.write_volatile(BAUD_57600);
+        // UART2_BAUD.write_volatile(BAUD_57600); // match sensor factory default; change to BAUD_9600 if reconfigured
+        UART2_BAUD.write_volatile(BAUD_9600); // match sensor factory default; change to BAUD_9600 if reconfigured
         UART2_TX_FIFO_CTRL.write_volatile(0);
         UART2_RX_FIFO_CTRL.write_volatile(0);
         UART2_CTRL.write_volatile(CTRL_8N1_FIFO_EN);
@@ -88,7 +85,7 @@ pub fn flush_tx() {
 }
 
 /// Read one byte with a timeout. Returns None if no byte arrives within ~50 ms.
-/// 500_000 iterations covers a 14-byte 9600 bps response (~15 ms) with margin.
+/// 500_000 iterations covers a 14-byte 57600 bps response (~2.4 ms) with large margin.
 pub fn read_byte() -> Option<u8> {
     let mut timeout = 500_000u32;
     unsafe {
