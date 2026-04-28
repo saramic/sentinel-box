@@ -17,3 +17,7 @@ panic-halt = "0.2"
 opt-level = "s"
 lto = true
 debug = true
+panic = "abort"
+
+[profile.dev]
+panic = "abort"

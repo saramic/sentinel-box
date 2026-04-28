@@ -1,118 +1,74 @@
 # in_attitude_meter
 
-Read roll, pitch, and yaw from the MAX32630FTHR's on-board BMI160 IMU
-and display on a MAX7219-powered LED matrix module.
+Reads X/Y acceleration from the BMI160 IMU on the MAX32630FTHR and displays
+a rolling/tilting bar on a MAX7219 8×8 LED matrix.
 
-**Approach:** Rust
-**Status:** Planned — display unblocked (bit-bang GPIO); IMU blocked on I2C HAL
+**Approach:** Rust bare-metal (no HAL, direct register access)
+**Status:** Working — bar responds to board tilt and rolls on velocity
 
----
+## Hardware wiring
 
-## Hardware
+### MAX7219 LED matrix — P3.0 / P3.1 / P3.2
 
-### MAX7219 LED matrix (display)
+Bit-banged SPI (write-only; no MISO required).
 
-Pins: VCC, GND, DIN, CS, CLK — this is **SPI** (write-only, no MISO).
+| MAX7219 pin | MAX32630FTHR pin | Notes |
+|-------------|-----------------|-------|
+| DIN (MOSI)  | P3.3            | |
+| CLK (SCLK)  | P3.4            | |
+| CS (/SS)    | P3.5            | active low |
+| VCC         | 3V3 header      | LDO3 rail |
+| GND         | GND header      | |
 
-| MAX7219 | SPI role | Direction |
-|---|---|---|
-| DIN | MOSI | MCU → device |
-| CS | /SS (active low) | MCU → device |
-| CLK | SCLK | MCU → device |
+### BMI160 IMU — I2CM2 (on-board, no wiring needed)
 
-Because the MAX7219 never sends data back, it can be **bit-banged with 3
-GPIO pins** today — no SPI HAL required:
+The BMI160 is soldered on the MAX32630FTHR and connected to I2CM2.
+Both BMI160 and the MAX14690 PMIC share this bus.
 
-```rust
-fn send_byte(din: &mut Pin, clk: &mut Pin, byte: u8) {
-    for i in (0..8).rev() {
-        set_pin(din, (byte >> i) & 1 != 0);
-        pulse_high(clk);
-    }
-}
+| Signal | MAX32630FTHR pin | Notes |
+|--------|-----------------|-------|
+| SDA    | P5.7            | I2CM2 Map A, 4.7 kΩ pull-up on board |
+| SCL    | P6.0            | I2CM2 Map A, 4.7 kΩ pull-up on board |
 
-fn write_reg(din: &mut Pin, cs: &mut Pin, clk: &mut Pin, reg: u8, val: u8) {
-    set_low(cs);
-    send_byte(din, clk, reg);
-    send_byte(din, clk, val);
-    set_high(cs);
-}
-```
+BMI160 I2C address: `0x68` (SDO tied low on board).
 
-When the SPI HAL exists, swap bit-bang for hardware SPI and the
-`max7219` driver crate.
+### MAX14690 PMIC — same I2CM2 bus
 
-### BMI160 IMU (attitude source)
+| Signal | MAX32630FTHR pin | Notes |
+|--------|-----------------|-------|
+| SDA    | P5.7            | shared with BMI160 |
+| SCL    | P6.0            | shared with BMI160 |
 
-The BMI160 is connected to the MAX32630 via I2C:
-- Bus: I2CM1 (MXC_I2CM1), base address `0x4001_8000`
-- Address: `0x68` (SDO low) or `0x69` (SDO high)
-- Registers of interest:
-  - `0x0F` CHIP_ID — should read `0xD1` to confirm comms
-  - `0x12` ACC_X_LSB / `0x13` ACC_X_MSB (and Y, Z)
-  - `0x0C` GYR_X_LSB / `0x0D` GYR_X_MSB (and Y, Z)
-  - `0x7E` CMD — write `0x11` to set accel normal mode
+PMIC I2C address: `0x28`. `pmic::init()` enables LDO3 (3.3 V rail) and
+must be called before any peripheral that needs 3V3.
 
-## What needs building first
+## How it works
 
-### Option A: LPSDK (faster start)
+- `sys::init()` selects the 96 MHz ring oscillator and loads factory trim values
+- `pmic::init()` enables LDO3 via I2CM2 (brings up 3V3 rail)
+- `bmi160::acc_init(AccOdr::Hz200)` sets accelerometer to 200 Hz normal mode
+- Main loop reads X and Y acceleration, maps them to a diagonal scrolling bar:
+  - Y tilt → bar velocity (tilt one way, bar scrolls; counter-tilt to slow it)
+  - X tilt → diagonal slope across the 8 columns
 
-```c
-#include "i2cm.h"
+## Diagnostic display (first 3 seconds after reset)
 
-// init
-const sys_cfg_i2cm_t i2cm_cfg = { ... };
-I2CM_Init(MXC_I2CM1, &i2cm_cfg, I2CM_SPEED_400KHZ);
+Rows 1–4 show I2C diagnostic values before the loop starts:
 
-// read chip ID
-uint8_t chip_id;
-I2CM_Read(MXC_I2CM1, 0x68, 0x0F, NULL, 0, &chip_id, 1, NULL);
-// expect chip_id == 0xD1
-```
+| Row | Value | Expected |
+|-----|-------|----------|
+| 1   | BMI160 chip_id (before ACC_NORMAL) | `0xD1` = `●●·●···●` |
+| 2   | I2CM2 INTFL (after chip_id read)   | `0x01` = TX_DONE only |
+| 3   | BMI160 chip_id (after ACC_NORMAL)  | `0xD1` still |
+| 4   | I2CM2 INTFL (after CMD write)      | `0x01` = TX_DONE only |
 
-### Option B: Rust (requires HAL work)
+`0x03` in rows 2 or 4 means TX_DONE + TX_NACK_ERR — device not responding.
 
-**Step 1** — create `crates/max32630-hal/` with I2C peripheral impl:
-
-```
-crates/
-  max32630-hal/
-    Cargo.toml       # depends on wez/max32630 PAC + embedded-hal
-    src/
-      lib.rs
-      i2c.rs         # implement embedded_hal::i2c::I2c for MAX32630
-      timer.rs       # implement embedded_hal::delay::DelayMs
-```
-
-I2CM1 register map (from LPSDK `i2cm_regs.h`):
-- Base: `0x4001_8000`
-- Key offsets: `CN` (control), `INT_FL` (flags), `FIFO` (data), `HS` (hs mode)
-
-**Step 2** — use `bmi160` crate once I2C trait is implemented:
-
-```toml
-[dependencies]
-bmi160 = "0.1"
-max32630-hal = { path = "../../crates/max32630-hal" }
-```
-
-```rust
-let i2c = I2c::new(p.I2CM1, 400.kHz());
-let mut imu = Bmi160::new_with_i2c(i2c, SlaveAddr::Default);
-imu.set_accel_power_mode(AccelPowerMode::Normal)?;
-let data = imu.data()?;
-```
-
-## Tests
-
-Integration tests should run against the real hardware via a serial
-loopback fixture. Unit tests for the HAL can run on host using
-`embedded-hal-mock`.
+## Build and upload
 
 ```sh
-# host unit tests (no hardware needed)
-cd crates/max32630-hal && cargo test
-
-# on-hardware test (requires board connected)
-# flash in_attitude_meter and read serial output
+mise run build:in_attitude_meter
+mise run upload:in_attitude_meter
+# or combined:
+mise run cbu:in_attitude_meter
 ```

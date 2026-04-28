@@ -183,8 +183,6 @@ The 6 Axis acccelerometer inside the MAX32630FTHR can be used for a balance bot
 most of the code has been downloaded into
 [./reference/MAX32630FTHR_balance_bot_code](reference/MAX32630FTHR_balance_bot_code)
 
-TODO
-
 ## Tue 22 Apr 2026
 
 ### Cold restart working with Rust 🦀

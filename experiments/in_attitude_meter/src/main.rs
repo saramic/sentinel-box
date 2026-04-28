@@ -16,11 +16,11 @@ use sys::CPU_HZ;
 
 // MAX7219 bit-bang SPI pins — P3 header on MAX32630FTHR
 const DIN_PORT: u32 = 3;
-const DIN_PIN: u32 = 0;
+const DIN_PIN: u32 = 3;
 const CLK_PORT: u32 = 3;
-const CLK_PIN: u32 = 1;
+const CLK_PIN: u32 = 4;
 const CS_PORT: u32 = 3;
-const CS_PIN: u32 = 2;
+const CS_PIN: u32 = 5;
 
 #[entry]
 fn main() -> ! {
@@ -31,9 +31,9 @@ fn main() -> ! {
     sys::delay_cycles(CPU_HZ / 10); // 100 ms
 
     let mut display = Max7219::new(
-        Pin::push_pull(DIN_PORT, DIN_PIN),
-        Pin::push_pull(CS_PORT, CS_PIN),
-        Pin::push_pull(CLK_PORT, CLK_PIN),
+        Pin::push_pull(DIN_PORT, DIN_PIN), // P3.3 DIN
+        Pin::push_pull(CS_PORT, CS_PIN),   // P3.5 CS
+        Pin::push_pull(CLK_PORT, CLK_PIN), // P3.4 CLK
     );
     display.init();
 

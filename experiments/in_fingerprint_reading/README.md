@@ -18,23 +18,40 @@ confirmed on the MAX7219 8×8 LED matrix.
 
 ## Hardware wiring
 
+### Fingerprint sensor → UART2 Map A
+
+UART2 Map A uses P3.0/P3.1 which are on the board header.
+UART1 Map A (P2.0/P2.1) is NOT available — those pins are not on the header.
+
 | Signal | Sensor wire | MAX32630FTHR pin | Notes |
 |--------|-------------|------------------|-------|
 | 3.3 V  | Red (VCC)   | 3V3 header       | LDO3 rail, enabled by pmic::init() |
 | GND    | Black (GND) | GND header       | |
-| TX→RX  | White (TX)  | P2.0             | UART1 Map A RX |
-| RX←TX  | Green (RX)  | P2.1             | UART1 Map A TX |
+| TX→RX  | Yellow (TX) | P3.0             | UART2 Map A RX |
+| RX←TX  | White (RX)  | P3.1             | UART2 Map A TX |
 
 The sensor Wakeup/Touch-out line is not used in this experiment.
+
+### MAX7219 LED matrix → P3.3 / P3.4 / P3.5
+
+P3.0 and P3.1 are taken by UART2, so the MAX7219 SPI bit-bang moves to the next
+available P3 pins compared to in_attitude_meter (where it uses P3.0/P3.1/P3.2).
+
+| MAX7219 pin | MAX32630FTHR pin | Notes |
+|-------------|-----------------|-------|
+| DIN (MOSI)  | P3.3            | |
+| CLK (SCLK)  | P3.4            | |
+| CS (/SS)    | P3.5            | active low |
+| VCC         | 3V3 header      | |
+| GND         | GND header      | |
 
 ## Implementation order
 
 ### Stage 1 — UART bring-up (uart.rs)
 
-- [ ] Confirm STATUS register bit for RX-not-empty and TX-not-full (check `uart_regs.h` from
-      mbed TARGET_MAX32630; likely STATUS bits 6=RX_EMPTY, 7=TX_FULL or similar)
-- [ ] Replace the placeholder busy-loop in `read_byte()` with a real status-bit poll
-- [ ] Verify 57600 bps divisor=13 with a logic analyser or oscilloscope on P2.1
+- [x] INTFL bit 3 = RX_FIFO_NOT_EMPTY confirmed from uart_regs.h (mbed TARGET_MAX32630)
+- [x] `read_byte()` polls INTFL bit 3 before reading FIFO (avoids AHB bus stall on empty read)
+- [ ] Verify 57600 bps divisor=13 with a logic analyser or oscilloscope on P3.1
 
 ### Stage 2 — Sensor handshake (fingerprint.rs + main.rs)
 
@@ -71,10 +88,8 @@ The sensor Wakeup/Touch-out line is not used in this experiment.
 
 | File | Location | Issue |
 |------|----------|-------|
-| uart.rs | `read_byte()` | Status bit for RX-not-empty not yet confirmed |
-| uart.rs | `write_byte()` | Status bit for TX-not-full not yet confirmed |
 | fingerprint.rs | `finger_search()` | found_id always returns 0; parse ACK payload |
-| uart.rs | baud rate | Divisor=13 (57600 bps) needs oscilloscope verification |
+| uart.rs | baud rate | Divisor=13 (57600 bps) needs oscilloscope verification on P3.1 |
 
 ## Modules shared with in_attitude_meter
 

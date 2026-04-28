@@ -63,6 +63,10 @@ pub fn send_packet(data: &[u8]) {
     uart::write_all(data);
     uart::write_byte((checksum >> 8) as u8);
     uart::write_byte((checksum & 0xFF) as u8);
+    // Wait until all bytes have physically left the UART shift register before
+    // we start polling for the sensor's ACK — otherwise the timeout in read_byte
+    // fires before the sensor has even received the complete command.
+    uart::flush_tx();
 }
 
 /// Read an ACK packet. Returns the confirmation code byte, or 0xFF on timeout/framing error.

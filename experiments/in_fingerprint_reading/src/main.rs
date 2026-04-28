@@ -15,13 +15,14 @@ mod uart;
 use gpio::Pin;
 use max7219::Max7219;
 
-// MAX7219 bit-bang SPI pins — same header as in_attitude_meter
+// MAX7219 bit-bang SPI pins.
+// P3.0/P3.1 are reserved for UART2 (fingerprint sensor), so MAX7219 moves to P3.3/P3.4/P3.5.
 const DIN_PORT: u32 = 3;
-const DIN_PIN: u32 = 0;
+const DIN_PIN: u32 = 3;
 const CLK_PORT: u32 = 3;
-const CLK_PIN: u32 = 1;
+const CLK_PIN: u32 = 4;
 const CS_PORT: u32 = 3;
-const CS_PIN: u32 = 2;
+const CS_PIN: u32 = 5;
 
 #[entry]
 fn main() -> ! {
