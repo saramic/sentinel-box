@@ -19,7 +19,9 @@
 // Source: LPSDK system_max3263x.c (mbed TARGET_MAX32630 device driver).
 
 // CLKMAN — base 0x4000_0400
-const CLKMAN_CLK_CTRL: *mut u32 = 0x4000_0400 as *mut u32; // offset 0x0000
+const CLKMAN_CLK_CTRL:      *mut u32 = 0x4000_0400 as *mut u32; // offset 0x0000
+const CLKMAN_SYS_SRC_MASK:  u32      = 0x0000_0003;
+const CLKMAN_SYS_SRC_96MHZ: u32      = 0x0000_0001;
 
 // TRIM (factory calibration info block) — base 0x4000_1000
 const TRIM_PWR_REG5: *const u32 = 0x4000_1034 as *const u32; // offset 0x0034
@@ -67,7 +69,9 @@ pub fn delay_cycles(cycles: u32) {
 
 unsafe fn sys_init() {
     // 1. Select 96 MHz ring oscillator (bits [1:0] = 0x1).
-    CLKMAN_CLK_CTRL.write_volatile(0x0000_0001);
+    CLKMAN_CLK_CTRL.write_volatile(CLKMAN_SYS_SRC_96MHZ);
+    cortex_m::asm::dsb();
+    while CLKMAN_CLK_CTRL.read_volatile() & CLKMAN_SYS_SRC_MASK != CLKMAN_SYS_SRC_96MHZ {}
 
     // 2. Load oscillator trim from INFO block → PWRSEQ.
     //    FLC_CTRL bit 25 = INFO_BLOCK_VALID.
