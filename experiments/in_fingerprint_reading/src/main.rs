@@ -29,7 +29,7 @@ fn main() -> ! {
     sys::init();
     pmic::init();
     // LDO3 (3V3 rail) just came up — let MAX7219 and fingerprint sensor complete POR.
-    asm::delay(9_600_000); // ~100 ms at 96 MHz
+    asm::delay(16_000_000); // ~167 ms at 96 MHz
 
     let mut display = Max7219::new(
         Pin::push_pull(DIN_PORT, DIN_PIN),

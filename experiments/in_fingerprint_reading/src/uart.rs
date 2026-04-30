@@ -16,8 +16,19 @@
 // CLKMAN — SYS_CLK_CTRL_8_UART (offset 0x0060) — shared clock for all UARTs.
 const CLKMAN_SYS_CLK_CTRL_8_UART: *mut u32 = 0x4000_0460 as *mut u32;
 
-// IOMAN — UART2_REQ (offset 0x0040): IO_MAP[0]=0 (Map A), IO_REQ[4]=1 → write 0x10.
-const IOMAN_UART2_REQ: *mut u32 = 0x4000_0C40 as *mut u32;
+// IOMAN — UART2_REQ (offset 0x0040) / UART2_ACK (offset 0x0044).
+// IO_MAP[0]=0 (Map A: P3.0/P3.1), IO_REQ[4]=1 → write 0x10.
+// ACK must read back 0x10 before the pins are usable as UART2.
+const IOMAN_UART2_REQ: *mut u32    = 0x4000_0C40 as *mut u32;
+const IOMAN_UART2_ACK: *const u32  = 0x4000_0C44 as *const u32;
+
+// GPIO — base 0x4000_A000
+// out_mode[port] = base + 0x0080 + port*4, 4 bits per pin (pin N = bits [N*4+3:N*4])
+//   0x0 = HIGH_Z input (default after reset)
+//   0x5 = normal push-pull output  ← required for UART TX to drive the wire
+// out_val[port] = base + 0x00C0 + port*4, 1 bit per pin
+const GPIO_OUT_MODE_P3: *mut u32 = (0x4000_A000 + 0x0080 + 3 * 4) as *mut u32;
+const GPIO_OUT_VAL_P3:  *mut u32 = (0x4000_A000 + 0x00C0 + 3 * 4) as *mut u32;
 
 // UART2 control registers — base 0x4001_4000
 const UART2_CTRL:         *mut u32 = 0x4001_4000 as *mut u32; // offset 0x0000
@@ -48,15 +59,30 @@ const CTRL_8N1_FIFO_EN: u32 = 0x37;
 //   bits [7:0]  = BAUD_DIVISOR
 //   bits [9:8]  = BAUD_MODE  (0 = 128× oversampling, 2 = fractional)
 //
-// Baud rate divisors for BAUD_MODE=0 (128× oversampling) at 96 MHz:
+// Baud rate divisors for BAUD_MODE=0 (128× oversampling).
+// CPU runs at 96 MHz (calibrated HIRC, confirmed via asm::delay probe ~1550 µs).
 //   divisor = 96_000_000 / (baud * 128)
-const BAUD_57600: u32 = 13; // ≈ 13.02 → 0.16% error — sensor factory default
-const BAUD_9600:  u32 = 78; // ≈ 78.13 → 0.16% error — use if sensor was reconfigured
+const BAUD_57600: u32 = 13; // 96_000_000 / (57600 * 128) = 13.02 → 13, 0.16% error
+const BAUD_9600:  u32 = 78; // 96_000_000 / (9600 * 128)  = 78.13 → 78, 0.16% error
 
 pub fn init() {
     unsafe {
         CLKMAN_SYS_CLK_CTRL_8_UART.write_volatile(1); // DIV_1 — all UARTs
-        IOMAN_UART2_REQ.write_volatile(0x10);          // Map A, IO_REQ=1
+
+        // P3.1 (TX): pre-set HIGH (UART idle) then switch to normal push-pull output.
+        // P3.0 (RX): leave as HIGH_Z input (default 0x0).
+        // Without this the GPIO drive is HIGH_Z after reset and UART TX has no output.
+        GPIO_OUT_VAL_P3.write_volatile(GPIO_OUT_VAL_P3.read_volatile() | (1 << 1));
+        let mode = GPIO_OUT_MODE_P3.read_volatile();
+        GPIO_OUT_MODE_P3.write_volatile((mode & !0xF0) | 0x50); // P3.1 = 0x5 normal drive
+
+        IOMAN_UART2_REQ.write_volatile(0x10);                          // Map A, IO_REQ=1
+        // Wait up to ~10 ms for IOMAN to grant pins — bounded so a bad ACK value
+        // doesn't hang forever, but long enough for the arbiter to respond.
+        let mut ioman_timeout = 960_000_u32;
+        while IOMAN_UART2_ACK.read_volatile() != 0x10 && ioman_timeout > 0 {
+            ioman_timeout -= 1;
+        }
         // UART2_BAUD.write_volatile(BAUD_57600); // match sensor factory default; change to BAUD_9600 if reconfigured
         UART2_BAUD.write_volatile(BAUD_9600); // match sensor factory default; change to BAUD_9600 if reconfigured
         UART2_TX_FIFO_CTRL.write_volatile(0);

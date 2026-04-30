@@ -20,7 +20,6 @@
 
 // CLKMAN — base 0x4000_0400
 const CLKMAN_CLK_CTRL:      *mut u32 = 0x4000_0400 as *mut u32; // offset 0x0000
-const CLKMAN_SYS_SRC_MASK:  u32      = 0x0000_0003;
 const CLKMAN_SYS_SRC_96MHZ: u32      = 0x0000_0001;
 
 // TRIM (factory calibration info block) — base 0x4000_1000
@@ -28,8 +27,10 @@ const TRIM_PWR_REG5: *const u32 = 0x4000_1034 as *const u32; // offset 0x0034
 const TRIM_PWR_REG6: *const u32 = 0x4000_1038 as *const u32; // offset 0x0038
 
 // PWRSEQ — base 0x4000_0800
+const PWRSEQ_REG0: *mut u32 = 0x4000_0800 as *mut u32; // offset 0x0000
 const PWRSEQ_REG5: *mut u32 = 0x4000_0814 as *mut u32; // offset 0x0014
 const PWRSEQ_REG6: *mut u32 = 0x4000_0818 as *mut u32; // offset 0x0018
+const PWRSEQ_REG0_HIRCEN: u32 = 1 << 12; // enable 96 MHz ring oscillator
 
 // FLC (flash controller) — base 0x4000_2000
 const FLC_CTRL:    *const u32 = 0x4000_2008 as *const u32; // offset 0x0008
@@ -68,17 +69,30 @@ pub fn delay_cycles(cycles: u32) {
 }
 
 unsafe fn sys_init() {
-    // 1. Select 96 MHz ring oscillator (bits [1:0] = 0x1).
-    CLKMAN_CLK_CTRL.write_volatile(CLKMAN_SYS_SRC_96MHZ);
-    cortex_m::asm::dsb();
-    while CLKMAN_CLK_CTRL.read_volatile() & CLKMAN_SYS_SRC_MASK != CLKMAN_SYS_SRC_96MHZ {}
+    // 1. Flash performance: AUTO_CLKDIV + back-to-back reads + merge-grab-GNT + AUTO_TACC.
+    //    Must be first: without AUTO_CLKDIV, flash reads at 96 MHz are unreliable, which
+    //    corrupts the TRIM values and leaves the HIRC oscillator running at ~48 MHz.
+    //    Bits: [16] | [24] | [28] | [29] = 0x3701_0000
+    let perform = FLC_PERFORM.read_volatile();
+    FLC_PERFORM.write_volatile(perform | 0x3701_0000);
 
-    // 2. Load oscillator trim from INFO block → PWRSEQ.
-    //    FLC_CTRL bit 25 = INFO_BLOCK_VALID.
+    // 2. Ensure the 96 MHz HIRC is fully powered, then switch to it.
+    //    On cold boot CLKMAN defaults to HIRC/2 (48 MHz). HIRC is already
+    //    running (it feeds HIRC/2), but setting HIRCEN in PWRSEQ_REG0 ensures
+    //    it is in full-power mode before we remove the divider.
+    //    A short delay lets the oscillator settle; no ready-bit poll is used
+    //    because the ready bit position is undocumented in available headers.
+    //    Source: LPSDK PreInit() in system_max3263x.c.
+    PWRSEQ_REG0.write_volatile(PWRSEQ_REG0.read_volatile() | PWRSEQ_REG0_HIRCEN);
+    cortex_m::asm::delay(200); // ~4 µs at 48 MHz — ring oscillator settles in < 1 µs
+
+    // 3. Load oscillator trim from INFO block → PWRSEQ while still on HIRC/2.
+    //    Must happen BEFORE the CLKMAN switch so HIRC is calibrated to 96 MHz
+    //    before we select it. Without TRIM, HIRC runs at ~54 MHz uncalibrated.
+    //    FLC_CTRL bit 25 = INFO_BLOCK_VALID. Flash reads are safe: AUTO_CLKDIV active.
     let flc_ctrl = FLC_CTRL.read_volatile();
     let trim5    = TRIM_PWR_REG5.read_volatile();
     let trim6    = TRIM_PWR_REG6.read_volatile();
-
     if (flc_ctrl & (1 << 25)) != 0 && trim5 != 0xFFFF_FFFF && trim6 != 0xFFFF_FFFF {
         PWRSEQ_REG5.write_volatile(trim5);
         PWRSEQ_REG6.write_volatile(trim6);
@@ -89,12 +103,13 @@ unsafe fn sys_init() {
         PWRSEQ_REG6.write_volatile((r6 & !0x01FF_0000) | (0x1E0 << 16));
     }
 
-    // 3. Flash performance: AUTO_CLKDIV + back-to-back reads + merge-grab-GNT + AUTO_TACC.
-    //    Bits: [16] | [24] | [28] | [29] = 0x3701_0000
-    let perform = FLC_PERFORM.read_volatile();
-    FLC_PERFORM.write_volatile(perform | 0x3701_0000);
+    // 4. Select now-calibrated 96 MHz ring oscillator (bits [1:0] = 0x1).
+    //    DSB+ISB flush the write and pipeline so subsequent code runs at 96 MHz.
+    CLKMAN_CLK_CTRL.write_volatile(CLKMAN_SYS_SRC_96MHZ);
+    cortex_m::asm::dsb();
+    cortex_m::asm::isb();
 
-    // 4. Enable DWT cycle counter.
+    // 5. Enable DWT cycle counter.
     //    TRCENA must be set before any DWT register is accessed.
     //    DSB+ISB ensure the write propagates through the pipeline before we proceed.
     //    DWT_LAR unlock (key 0xC5ACCE55) is required on some implementations where

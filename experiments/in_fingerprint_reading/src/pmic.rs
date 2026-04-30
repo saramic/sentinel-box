@@ -26,11 +26,12 @@ const I2CM2_INTEN: *mut u32 = 0x4001_801C as *mut u32; // offset 0x001C
 // I2CM2 TX FIFO — base 0x4010_9000 (16-bit tagged entries)
 const I2CM2_FIFO_TX: *mut u16 = 0x4010_9000 as *mut u16;
 
-// fs_clk_div for 100 kHz at 96 MHz.
-// Source: LPSDK i2cm.c clk_div_table + mbed-os low_level_init.c (both agree).
-// Fields: FILTER_CLK_DIV[7:0]=48, SCL_LO_CNT[19:8]=576, SCL_HI_CNT[31:20]=164
-const FS_CLK_DIV_100KHZ_96MHZ: u32 =
-    (48_u32) | (576_u32 << 8) | (164_u32 << 20);
+// fs_clk_div values at 96 MHz. Source: LPSDK i2cm.c clk_div_table.
+// Fields: FILTER_CLK_DIV[7:0]=48, SCL_LO_CNT[19:8], SCL_HI_CNT[31:20]
+// 100 kHz values from LPSDK; 50 kHz doubles the SCL counts.
+// Use 50 kHz if the board's pull-up resistors (>4.7 kΩ) cause NACKs at 100 kHz.
+const FS_CLK_DIV_100KHZ_96MHZ: u32 = (48_u32) | ( 576_u32 << 8) | (164_u32 << 20);
+const FS_CLK_DIV_50KHZ_96MHZ:  u32 = (48_u32) | (1152_u32 << 8) | (328_u32 << 20);
 
 // FIFO transaction tags (i2cm_regs.h MXC_S_I2CM_TRANS_TAG_*)
 const TAG_START: u16 = 0x000;
@@ -56,7 +57,7 @@ unsafe fn pmic_init() {
     IOMAN_I2CM2_REQ.write_volatile(0x10);
 
     // Configure I2CM2 at 100 kHz
-    I2CM2_FS_CLK_DIV.write_volatile(FS_CLK_DIV_100KHZ_96MHZ);
+    I2CM2_FS_CLK_DIV.write_volatile(FS_CLK_DIV_50KHZ_96MHZ);
     I2CM2_CTRL.write_volatile(0x80); // MSTR_RESET_EN: reset peripheral
     I2CM2_CTRL.write_volatile(0x00); // release reset
     I2CM2_CTRL.write_volatile(0x0C); // TX_FIFO_EN(bit2) | RX_FIFO_EN(bit3)
