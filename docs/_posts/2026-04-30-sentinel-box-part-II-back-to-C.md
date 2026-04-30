@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Sentinel Box - Part II - back to C"
-date:   2026-04-21 23:59:59 +1000
+date:   2026-04-30 22:00:00 +1000
 categories: sentinel-box update
 ---
 
