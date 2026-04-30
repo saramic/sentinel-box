@@ -96,6 +96,39 @@ run = """
 """
 
 #
+# Experiments in fingerprint reading - LPSDK 🅲
+#
+[tasks."cbu:in_fingerprint_reading_LPSDK"]
+description = "clean-build-upload fingerprint reading LPSDK"
+run = """
+  mise run clean:in_fingerprint_reading_LPSDK
+  mise run build:in_fingerprint_reading_LPSDK
+  mise run upload:in_fingerprint_reading_LPSDK
+"""
+
+[tasks."clean:in_fingerprint_reading_LPSDK"]
+description = "clean fingerprint reading LPSDK"
+dir = "experiments/in_fingerprint_reading_LPSDK"
+run = "make clean"
+
+[tasks."build:in_fingerprint_reading_LPSDK"]
+description = "build fingerprint reading LPSDK firmware"
+dir = "experiments/in_fingerprint_reading_LPSDK"
+run = "make"
+
+[tasks."upload:in_fingerprint_reading_LPSDK"]
+description = "upload fingerprint reading LPSDK firmware"
+dir = "experiments/in_fingerprint_reading_LPSDK"
+run = """
+    openocd \
+        -s /usr/local/share/openocd/scripts \
+        -f interface/cmsis-dap.cfg \
+        -f target/max3263x.cfg \
+        -c 'reset_config srst_only' \
+        -c 'program build/in_fingerprint_reading_lpsdk.elf verify reset exit'
+"""
+
+#
 # Experiments in blink - Rust 🦀
 #
 [tasks."clean:in_blink_rust"]
