@@ -28,10 +28,10 @@ schematic of the dev board to see how it hangs together. This should have
 **turned me OFF** the idea of rust, but it gave me some false hope and I
 continued.
 
-![part of the MAX32640FTHR diagram highlighting the BMi160 accelerometer chip](
+![part of the MAX32630FTHR diagram highlighting the BMi160 accelerometer chip](
 /sentinel-box/assets/20260430_01_max32630_BMi160_accelerometer.png)
 
-The **BMi160** accelerometer chip higlighted on the block diagram of the
+The **BMi160** accelerometer chip highlighted on the block diagram of the
 **MAX32630FTHR**
 
 Next on the diagram there was an Accelerometer and Gyroscope using the
@@ -56,8 +56,8 @@ it was time to use a finger print reader. This would need **UART** (Universal
 Asynchronous Receiver-Transmitter) surely that cannot be hard? Well this is
 where the speed changes of 4X – 20X really started to bite. You see if you
 don't know how fast your clock speed is going, you are not going to be able to
-transmit or recieve at a given Baud. I tried a bunch of things. As I don't have
-a logic analyzer nor oscilliscope on hand, I ended up hooking up an **ESP32**
+transmit or receive at a given Baud. I tried a bunch of things. As I don't have
+a logic analyzer nor oscilloscope on hand, I ended up hooking up an **ESP32**
 to measure the duration of pulses. I didn't know there was a function to
 measure pulse length
 [`pulseIn`](https://docs.arduino.cc/language-reference/en/functions/advanced-io/pulseIn/)
@@ -84,12 +84,12 @@ Serial.printf(
 ```
 
 The above code also made me realise that `\n` does not cut it and my serial
-monitor only displayed the outpuot when I had `\r\n` - need that Carrige
+monitor only displayed the output when I had `\r\n` - need that Carriage
 return.
 
 And all my Rust results were conclusive on 1 part, I was never getting 96 MHz.
 After some digging around I found the C file in LPSDK that seems to do the
-setup of the frequence
+setup of the frequency
 
 `Maxim/Firmware/MAX3263X/Libraries/CMSIS/Device/Maxim/MAX3263X/Source/system_max3263x.c`
 
@@ -146,10 +146,17 @@ the finger print reader.
   Your browser does not support the video tag.
 </video>
 
+Getting the fingerprint, LED Matrix and rotary encoder was the easy bit, but
+having a state diagram that can save a bunch of fingerprints and identify them
+was starting to get a bit complicated, as is the setup on my workbench.
+
+<img src="/sentinel-box/assets/20260430_04_encoder_state_machine.png"
+  alt="Encoder and fingerprint state machine flow chart" width="740" />
+
 ## Next
 
 Now that I have a basic fingerprint reader and a build system that I am
-cofident in, I think I need to get the required piece for a minimal complete
+confident in, I think I need to get the required piece for a minimal complete
 build, some kind of actuator working: stepper motor, servo motor or just a
 motor with a worm drive. This will allow me to create a lock box with multi
 finger print triggering. If I get time, I may be able to expand on that. Time

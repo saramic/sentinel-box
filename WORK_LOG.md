@@ -99,6 +99,40 @@ stateDiagram-v2
     Enroll --> Idle : button press · cancel\nor slot 5 stored · show enc_value
 ```
 
+maybe this can be simplified a bit
+
+```mermaid
+stateDiagram-v2
+    [*] --> Startup
+
+    Startup --> Idle : sensor OK · blue LED
+    Startup --> SensorError : no response
+    SensorError --> SensorError : X flashes forever
+
+    state Idle {
+        [*] --> Showing
+        Showing --> FingerScan : finger detected
+        FingerScan --> Showing : img2tz failed · X×3
+        FingerScan --> Match : search match (1–5)\nshow slot number · green LED · 2s
+        FingerScan --> NoMatch : no match · X×3
+        Match --> Showing : wait for lift + 300ms
+        NoMatch --> Showing
+    }
+
+    Idle --> Enroll : at F · press button\nslot available · display E
+
+    state Enroll {
+        [*] --> WaitFinger1
+        WaitFinger1 --> WaitLift : finger 1 OK · green flash
+        WaitLift --> WaitFinger2 : finger lifted
+        WaitFinger2 --> WaitFinger1 : img2tz(2) or merge failed · red LED
+        WaitFinger2 --> Stored : finger 2 OK · merged · stored\nshow slot number · green · 2s
+        Stored --> WaitFinger1 : next_slot++ · slots remain · show E
+    }
+
+    Enroll --> Idle : button press · cancel\nor slot 5 stored · show enc_value
+```
+
 ## Wed 24 Apr 2026
 
 ### experiments in attitude meter 🛩️ 🧭
