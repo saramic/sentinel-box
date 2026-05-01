@@ -224,6 +224,68 @@ run = """
         -c 'reset_config srst_only' \
         -c 'program target/thumbv7em-none-eabihf/release/in_fingerprint_reading verify reset exit'
 """
+#
+# Experiments in UART comms - Mbed 🅼🅱🅴🅳
+#
+[tasks."cbu:in_uart_comms_mbed"]
+description = "clean-build-upload UART mbed"
+run = """
+  mise run clean:in_uart_comms_mbed
+  mise run build:in_uart_comms_mbed
+  mise run upload:in_uart_comms_mbed
+"""
+
+[tasks."clean:in_uart_comms_mbed"]
+description = "clean UART mbed"
+run = "pio run -e max32630fthr-uart --target clean"
+
+[tasks."build:in_uart_comms_mbed"]
+description = "build UART mbed firmware"
+run = "pio run -e max32630fthr-uart"
+
+[tasks."upload:in_uart_comms_mbed"]
+description = "upload UART mbed firmware"
+run = """
+    openocd \
+        -s /usr/local/share/openocd/scripts \
+        -f interface/cmsis-dap.cfg \
+        -f target/max3263x.cfg \
+        -c 'reset_config srst_only' \
+        -c 'program .pio/build/max32630fthr-uart/firmware.elf verify reset exit'
+"""
+
+#
+# Experiments in UART - LPSDK 🅲
+#
+[tasks."cbu:in_uart_comms_LPSDK"]
+description = "clean-build-upload UART"
+run = """
+  mise run clean:in_uart_comms_LPSDK
+  mise run build:in_uart_comms_LPSDK
+  mise run upload:in_uart_comms_LPSDK
+"""
+
+[tasks."clean:in_uart_comms_LPSDK"]
+description = "clean UART LPSDK"
+dir = "experiments/in_uart_comms"
+run = "make clean"
+
+[tasks."build:in_uart_comms_LPSDK"]
+description = "build UART LPSDK firmware"
+dir = "experiments/in_uart_comms"
+run = "make"
+
+[tasks."upload:in_uart_comms_LPSDK"]
+description = "upload UART LPSDK firmware"
+dir = "experiments/in_uart_comms"
+run = """
+    openocd \
+        -s /usr/local/share/openocd/scripts \
+        -f interface/cmsis-dap.cfg \
+        -f target/max3263x.cfg \
+        -c 'reset_config srst_only' \
+        -c 'program build/in_uart_comms_lpsdk.elf verify reset exit'
+"""
 
 [tools]
 ruby = "3.2.2"

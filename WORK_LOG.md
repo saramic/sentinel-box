@@ -49,6 +49,64 @@
 
 ---
 
+## Fri 1 May 2026
+
+### Uart comms
+
+A comment came up on my last post about UART comms. [Sentinel Box - Part II - back to C](
+  https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56894/sentinel-box---part-ii---back-to-c
+)
+
+presumably in regards to @skruglewicz design
+
+[Forum #5: Proposed Design — Adaptive Sentinel: Security & Environmental Intelligence Hub](
+  https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56892/forum-5-proposed-design-adaptive-sentinel-security-environmental-intelligence-hub
+)
+
+having a MAX32630FTHR talk UART to a UNO Q
+and another MAX32630FTHR talk UART to the same UNO Q
+
+UART should work:
+- with same voltage either 3V3 or 5V otherwise you will need a lievel shifter
+- RX on one board has to go across to TX on the other board
+- they need a shared GND
+
+Baud rates
+- < 1m 115200+ should be ok
+- ~3m 115200 is the limit
+- ~10m 9600-57600 would start seeing errors
+- > 10m move to something like RS-323 or RS-485
+
+UART is fine for 2 boards on a desk
+
+Other alternatives are
+- CAN bus
+  - 128 (CAN) nodes or unlimited with CAN FD
+  - 500m @125kbps or 40m @1Mbps
+  - CRC + ACK + error frames
+  - 2 wires twisted pair + GND
+  - needs MCP2515 or similar chip
+  - needs 120Ω termination resistors to prevent reflection corrupting the signal
+- I2C
+  - can have up to 127 devices
+  - short distances <1m
+  - Master/Slave topology fits
+  - may need pull-up resistors 4.7kΩ at 100kHz
+  - SDA/SCL share bus so needs collision management
+- RS-485
+  - can have 32 nodes
+  - cheap MAX485 or SP3485 chips
+  - still UART underneath
+  - 100m+ at 100kbps
+  - differential signaling means it is noise immune
+
+there is also: LIN Bus, Modbus, EtherCAT, 1-Wire, SPI
+
+TO acutally get UART working you have 3 approaches:
+1. Request/Response - one device is mater and sends requests and then listens - simple and predictable
+2. Turn-taking with a token/flag byte
+3. Asychronous/event-driven - dependent on UART being full-duplex - but you need start/end framing markers and buffering so you can assemble complete messages from the stream
+
 ## Thu 30 Apr 2026
 
 After a bunch of misstarts with trying to get the 96 MHz frequency set on the
