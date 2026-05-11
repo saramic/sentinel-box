@@ -54,28 +54,22 @@ static void led_set(int r, int g, int b)
 }
 
 /* -------------------------------------------------------------------------
- * 28BYJ-48 stepper via ULN2003 driver board — half-step mode.
+ * Stepper mode — uncomment exactly one line.
  *
- * Pin mapping (avoids all fingerprint-LPSDK wiring on P3.0-P3.5, P5.3-P5.5):
- *   IN1 = P5.2   IN2 = P5.1   IN3 = P5.0   IN4 = P4.0
+ * Mode        Steps/rev   Delay    Speed
+ * HALF_STEP   4096        1.5 ms  ~10 RPM  smooth, reliable  ← default
+ * FULL_STEP   2048        1.5 ms  ~20 RPM  faster, less smooth
  *
- * Half-step table — 8 states, {IN1,IN2,IN3,IN4}:
- *   0:1000  1:1100  2:0100  3:0110
- *   4:0010  5:0011  6:0001  7:1001
- *
- * Forward (+steps): index advances 0→1→…→7→0
- * Reverse  (-steps): index retreats 0→7→…→1→0
- *
- * Gear ratio ≈ 64:1, internal motor 64 half-steps/rev
- * → 4096 half-steps per output-shaft revolution
- * → STEPS_90 = 1024 half-steps ≈ 90°
+ * STEP_DELAY_US can be tuned independently. Below ~1000 µs the 28BYJ-48 stalls.
  * ------------------------------------------------------------------------- */
-static const gpio_cfg_t s_in1 = { PORT_5, PIN_2, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL };
-static const gpio_cfg_t s_in2 = { PORT_5, PIN_1, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL };
-static const gpio_cfg_t s_in3 = { PORT_5, PIN_0, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL };
-static const gpio_cfg_t s_in4 = { PORT_4, PIN_0, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL };
+#define STEPPER_HALF_STEP
+/* #define STEPPER_FULL_STEP */
 
-static const uint8_t half_step[8][4] = {
+#if defined(STEPPER_HALF_STEP)
+#  define STEP_DELAY_US   1500
+#  define STEPS_PER_REV   4096
+#  define STEP_TABLE_LEN  8
+static const uint8_t step_table[8][4] = {
     { 1, 0, 0, 0 },
     { 1, 1, 0, 0 },
     { 0, 1, 0, 0 },
@@ -85,12 +79,41 @@ static const uint8_t half_step[8][4] = {
     { 0, 0, 0, 1 },
     { 1, 0, 0, 1 },
 };
+#elif defined(STEPPER_FULL_STEP)
+#  define STEP_DELAY_US   1500
+#  define STEPS_PER_REV   2048
+#  define STEP_TABLE_LEN  4
+/* Wave drive: same single-coil states as half-step, just skipping the in-between */
+static const uint8_t step_table[4][4] = {
+    { 1, 0, 0, 0 },
+    { 0, 1, 0, 0 },
+    { 0, 0, 1, 0 },
+    { 0, 0, 0, 1 },
+};
+#else
+#  error "Uncomment either STEPPER_HALF_STEP or STEPPER_FULL_STEP above"
+#endif
+
+/* -------------------------------------------------------------------------
+ * 28BYJ-48 stepper via ULN2003 driver board.
+ *
+ * Pin mapping (avoids all fingerprint-LPSDK wiring on P3.0-P3.5, P5.3-P5.5):
+ *   IN1 = P5.2   IN2 = P5.1   IN3 = P5.0   IN4 = P4.0
+ *
+ * Forward (+steps): table index advances each step
+ * Reverse  (-steps): table index retreats each step
+ * Gear ratio ≈ 64:1 → STEPS_PER_REV steps per output-shaft revolution
+ * ------------------------------------------------------------------------- */
+static const gpio_cfg_t s_in1 = { PORT_5, PIN_2, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL };
+static const gpio_cfg_t s_in2 = { PORT_5, PIN_1, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL };
+static const gpio_cfg_t s_in3 = { PORT_5, PIN_0, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL };
+static const gpio_cfg_t s_in4 = { PORT_4, PIN_0, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL };
 
 static int step_idx = 0;
 
 static void stepper_apply(void)
 {
-    const uint8_t *s = half_step[step_idx];
+    const uint8_t *s = step_table[step_idx];
     s[0] ? GPIO_OutSet(&s_in1) : GPIO_OutClr(&s_in1);
     s[1] ? GPIO_OutSet(&s_in2) : GPIO_OutClr(&s_in2);
     s[2] ? GPIO_OutSet(&s_in3) : GPIO_OutClr(&s_in3);
@@ -113,27 +136,20 @@ static void stepper_init(void)
     GPIO_Config(&s_in4); GPIO_OutClr(&s_in4);
 }
 
-/* 3 ms per half-step → reliable torque throughout the move.
- * Going below ~2 ms risks losing steps on direction reversal. */
-#define STEP_DELAY_US   3000
-#define STEPS_PER_REV   4096
-#define STEPS_90        (STEPS_PER_REV / 4)   /* 1024 half-steps ≈ 90° */
+#define STEPS_90  (STEPS_PER_REV / 4)
 
 /* positive steps = forward, negative = reverse.
- * Coils remain energised after returning so the gear train stays meshed —
- * call stepper_off() explicitly if you want to save power / reduce heat. */
+ * Coils stay energised after returning — keeps the gearbox meshed so direction
+ * reversals start with torque rather than fighting backlash (vibration). */
 static void stepper_move(int steps)
 {
     int dir = (steps > 0) ? 1 : -1;
     int n   = (steps > 0) ? steps : -steps;
     for (int i = 0; i < n; i++) {
-        step_idx = (step_idx + dir + 8) % 8;
+        step_idx = (step_idx + dir + STEP_TABLE_LEN) % STEP_TABLE_LEN;
         stepper_apply();
         TMR_Delay(MXC_TMR0, USEC(STEP_DELAY_US));
     }
-    /* intentionally no stepper_off() here: holding the last coil state keeps
-     * the gearbox meshed so the next move (especially a direction reversal)
-     * starts with torque rather than fighting backlash, which causes vibration */
 }
 
 /* -------------------------------------------------------------------------

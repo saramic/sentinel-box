@@ -97,10 +97,17 @@ backlash and the motor vibrates without moving. Call `stepper_off()` explicitly
 if you want to save power — but only do so well before the next move starts.
 The motor body will run warm when held; this is normal for this motor class.
 
-**Step timing**
-`STEP_DELAY_US = 3000` (3 ms per half-step) gives reliable torque throughout the
-move. Going below ~2 ms risks stalling or losing steps, especially on reversal.
-Going above ~10 ms is just slow. Adjust to taste.
+**Step mode and speed**
+Two modes are available — switch by editing the two `#define` lines near the top
+of `main.c`:
+
+| Mode              | `#define`           | Steps/rev | Delay  | Speed   |           |
+|-------------------|---------------------|-----------|--------|---------|-----------|
+| Half-step         | `STEPPER_HALF_STEP` | 4096      | 1.5 ms | ~10 RPM | ← default |
+| Full-step (wave)  | `STEPPER_FULL_STEP` | 2048      | 1.5 ms | ~20 RPM |           |
+
+`STEP_DELAY_US` can also be tuned independently of the mode. Below ~1000 µs
+the 28BYJ-48 gearbox stalls. Above ~10 ms is just slow.
 
 **Accuracy and backlash**
 The 28BYJ-48 gearbox has measurable backlash. 1024 half-steps targets 90° but
@@ -119,11 +126,11 @@ accurate positioning you can calibrate with `STEPS_PER_REV = 4076`.
 
 ## Behaviour
 
-| LED colour | Meaning |
-|------------|---------|
-| Green      | Rotating 360° forward |
-| Blue       | Rotating 360° reverse |
-| Red        | Done (3 cycles complete) — reset board to run again |
+| LED colour | Meaning                                              |
+|------------|------------------------------------------------------|
+| Green      | Rotating 360° forward                                |
+| Blue       | Rotating 360° reverse                                |
+| Red        | Done (3 cycles complete) — reset board to run again  |
 
 ## Build and upload
 
