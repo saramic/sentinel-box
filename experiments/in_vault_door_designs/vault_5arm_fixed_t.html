@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5-Arm Vault Lock · T-Slider Fixed</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&display=swap');
+:root {
+  --bg:#08090c; --panel:#0d1117; --border:#1a2a35;
+  --accent:#4fc3f7; --gold:#ffc107; --red:#ef5350; --green:#66bb6a;
+  --text:#c8d8e8; --dim:#4a6070;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Rajdhani',sans-serif;
+  min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px 10px 40px;}
+header{text-align:center;margin-bottom:14px;}
+header h1{font-size:1.45rem;font-weight:700;letter-spacing:.22em;color:var(--accent);text-transform:uppercase;}
+header p{font-family:'Share Tech Mono',monospace;font-size:.66rem;color:var(--dim);letter-spacing:.14em;margin-top:2px;}
+.layout{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;justify-content:center;width:100%;max-width:1080px;}
+.canvas-col{display:flex;flex-direction:column;}
+.tabs{display:flex;}
+.tab{flex:1;padding:7px 4px;text-align:center;font-family:'Share Tech Mono',monospace;font-size:.6rem;
+  letter-spacing:.1em;cursor:pointer;border:1px solid var(--border);background:var(--bg);
+  color:var(--dim);transition:all .15s;text-transform:uppercase;}
+.tab.active{background:var(--panel);color:var(--accent);border-bottom-color:var(--panel);}
+canvas{border:1px solid var(--border);border-top:none;border-radius:0 0 4px 4px;
+  background:#05070e;box-shadow:0 0 60px rgba(79,195,247,.05),inset 0 0 80px rgba(0,0,20,.8);display:block;}
+.sidebar{display:flex;flex-direction:column;gap:11px;min-width:255px;max-width:278px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:12px 14px;}
+.card-title{font-family:'Share Tech Mono',monospace;font-size:.58rem;letter-spacing:.2em;color:var(--accent);
+  text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:8px;}
+.badge{text-align:center;font-size:1.25rem;font-weight:700;letter-spacing:.12em;padding:8px;border-radius:3px;transition:all .4s;}
+.badge.locked  {background:rgba(239,83,80,.13); color:var(--red);  border:1px solid rgba(239,83,80,.28);}
+.badge.unlocked{background:rgba(102,187,106,.13);color:var(--green);border:1px solid rgba(102,187,106,.28);}
+.badge.moving  {background:rgba(255,193,7,.09); color:var(--gold); border:1px solid rgba(255,193,7,.22);}
+.btn-row{display:flex;gap:7px;}
+button{flex:1;padding:8px 4px;background:transparent;border:1px solid var(--border);border-radius:3px;
+  color:var(--accent);font-family:'Share Tech Mono',monospace;font-size:.68rem;cursor:pointer;letter-spacing:.07em;transition:all .14s;}
+button:hover{background:#0f2030;border-color:var(--accent);}
+button.red{color:var(--red);}button.red:hover{background:rgba(239,83,80,.1);border-color:var(--red);}
+button.grn{color:var(--green);}button.grn:hover{background:rgba(102,187,106,.1);border-color:var(--green);}
+.ctrl{display:flex;flex-direction:column;gap:3px;margin-bottom:8px;}
+.ctrl-lbl{font-size:.72rem;color:var(--dim);display:flex;justify-content:space-between;}
+.ctrl-lbl span{color:var(--text);font-family:'Share Tech Mono',monospace;font-size:.7rem;}
+input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer;}
+.spec{display:flex;justify-content:space-between;align-items:baseline;padding:3px 0;border-bottom:1px solid #0d1820;}
+.spec:last-child{border-bottom:none;}
+.sk{color:var(--dim);font-size:.76rem;}.sv{color:#e0f2f1;font-family:'Share Tech Mono',monospace;font-size:.78rem;}
+.sv.hi{color:var(--gold);font-size:.9rem;font-weight:bold;}
+.note{font-size:.76rem;color:#546e7a;line-height:1.65;}.note strong{color:#80cbc4;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Vault Lock · 5 T-Sliders</h1>
+  <p>Ø100mm CENTRAL CRANK · Ø400mm OUTER · RIGID T-HEAD · SHARED GUIDES</p>
+</header>
+<div class="layout">
+  <div class="canvas-col">
+    <div class="tabs">
+      <div class="tab active" onclick="setTab('motion')">◉ Motion</div>
+      <div class="tab" onclick="setTab('dims')">⊞ Dimensions</div>
+      <div class="tab" onclick="setTab('build')">⊕ Build</div>
+    </div>
+    <canvas id="cv" width="560" height="560"></canvas>
+  </div>
+  <div class="sidebar">
+    <div class="card"><div class="badge locked" id="badge">⬡  LOCKED</div></div>
+    <div class="card">
+      <div class="card-title">Drive Control</div>
+      <div class="ctrl">
+        <div class="ctrl-lbl">Crank angle θ <span id="aDisp">0°</span></div>
+        <input type="range" id="aSlider" min="0" max="90" value="0" oninput="manual(this.value)">
+      </div>
+      <div style="display:flex;justify-content:space-between;font-family:'Share Tech Mono',monospace;font-size:.62rem;color:var(--dim);margin-bottom:7px">
+        <span>0° LOCKED</span><span style="color:var(--gold)" id="extDisp">—</span><span id="openLabel">90° OPEN</span>
+      </div>
+      <div class="btn-row">
+        <button class="red" onclick="animTo(0)">⬡ LOCK</button>
+        <button class="grn" onclick="animTo(thetaMax)">⬢ UNLOCK</button>
+      </div>
+      <div class="btn-row" style="margin-top:6px">
+        <button onclick="toggleCycle()">↺ CYCLE</button>
+        <button onclick="animTo(0)">⟳ RESET</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Tune Geometry</div>
+      <div class="ctrl">
+        <div class="ctrl-lbl">Pin radius r <span id="rDisp">30mm</span></div>
+        <input type="range" id="rSlider" min="10" max="48" value="30" oninput="updateGeo()">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-lbl">Rod length L <span id="lDisp">100mm</span></div>
+        <input type="range" id="lSlider" min="50" max="200" value="100" oninput="updateGeo()">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-lbl">T-head fill % <span id="twDisp">50%</span></div>
+        <input type="range" id="twSlider" min="20" max="70" value="50" oninput="updateGeo()">
+      </div>
+      <div class="ctrl">
+        <div class="ctrl-lbl">Pin protrusion <span id="ppDisp">20mm</span></div>
+        <input type="range" id="ppSlider" min="5" max="40" value="20" oninput="updateGeo()">
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Dimensions</div>
+      <div class="spec"><span class="sk">Outer disc</span>         <span class="sv">Ø 400mm</span></div>
+      <div class="spec"><span class="sk">Central crank disc</span> <span class="sv">Ø 100mm</span></div>
+      <div class="spec"><span class="sk">Pin radius (r)</span>     <span class="sv" id="sR">—</span></div>
+      <div class="spec"><span class="sk">Rod length (L)</span>     <span class="sv" id="sL">—</span></div>
+      <div class="spec"><span class="sk">Crank stroke</span>       <span class="sv" id="sStroke">—</span></div>
+      <div class="spec"><span class="sk">Pin protrusion</span>     <span class="sv hi" id="sProt">—</span></div>
+      <div class="spec"><span class="sk">T-head arc</span>         <span class="sv" id="sTHead">—</span></div>
+      <div class="spec"><span class="sk">Gap arc</span>            <span class="sv" id="sGap">—</span></div>
+      <div class="spec"><span class="sk">Shared guides</span>      <span class="sv">5 (one per gap)</span></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Design Logic</div>
+      <p class="note">
+        The <strong>T is one rigid piece</strong> — it slides in and out but
+        never changes shape. The crank-slider controls radial position only.
+        At θ=0° the T-head protrudes past the disc edge by the fixed
+        <strong>pin protrusion</strong> amount. At θ=90° it's fully retracted.
+        The <strong>5 guide blocks</strong> (gold) each sit between two
+        adjacent T-heads, guiding both simultaneously.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const W=560, H=560, CX=280, CY=280;
+
+// ── Fixed geometry ─────────────────────────────────────────
+const R_OUTER   = 200;   // outer disc radius mm
+const R_CRANK   = 50;    // crank disc radius mm
+const N         = 5;
+const SC        = (W/2 - 14) / 235; // px/mm, 235mm half-view
+
+// ── Tunable ────────────────────────────────────────────────
+let r           = 30;    // crank pin radius mm
+let L           = 100;   // connecting rod length mm
+let tHeadPct    = 0.50;  // fraction of 72° each T-head fills
+let pinProt     = 20;    // fixed protrusion past disc edge mm (design target)
+
+// ── Animation ──────────────────────────────────────────────
+let theta=0, animTarget=null, cycling=false, cycleDir=1, raf=null, tab='motion';
+let thetaMax = 90;
+
+function s(mm){ return mm * SC; }
+
+// Piston distance from disc centre (crank-slider formula)
+function pistonR(tDeg){
+  const t = tDeg * Math.PI / 180;
+  return r*Math.cos(t) + Math.sqrt(Math.max(0, L*L - r*r*Math.sin(t)*Math.sin(t)));
+}
+function stroke(){ return pistonR(0) - pistonR(90); }
+
+// Max crank angle before crossbar hits spacer outer edge
+function computeThetaMax(){
+  // clamping starts when pistonR(theta) = pistonR(0) + T_BAR_THICK - 40 - pinProt
+  const pdStop = pistonR(0) + T_BAR_THICK - 40 - pinProt;
+  if(pdStop <= pistonR(90)) return 90;  // never clamps within 0-90°
+  let lo=0, hi=90;
+  for(let k=0;k<40;k++){
+    const mid=(lo+hi)/2;
+    pistonR(mid) > pdStop ? (lo=mid) : (hi=mid);
+  }
+  return (lo+hi)/2;
+}
+
+// ── T-shape dimensions (FIXED, never change with theta) ────
+// The T-head crossbar: arc-shaped, fixed angular width, fixed radial thickness
+const T_BAR_THICK = 30;  // mm, radial thickness of crossbar
+// The stem: fixed length, connects crossbar to piston pin
+const T_STEM_W    = 40;  // mm, stem width
+
+// At theta=0 (locked):
+//   - outer face of T-bar is at R_OUTER + pinProt
+//   - inner face of T-bar is at R_OUTER + pinProt - T_BAR_THICK
+//   - piston pin is at pistonR(0) from disc centre
+//   - stem inner end (tail) = pistonR(0) - stemLength/2
+
+// The T-piece slides so its piston-pin hole is always at pistonR(theta)
+// T-bar outer radius FROM DISC CENTRE = pistonR(theta) + offset
+// We define: when theta=0, T-bar outer = R_OUTER + pinProt
+// offset = (R_OUTER + pinProt) - pistonR(0)  ← fixed!
+// So at any theta: T-bar outer = pistonR(theta) + offset
+
+// ── Draw one complete T-arm ────────────────────────────────
+function drawTArm(c, armAngleDeg, thetaDeg){
+  const a    = armAngleDeg * Math.PI / 180;
+  const cosA = Math.cos(a), sinA = Math.sin(a);
+  const cosP = -sinA, sinP = cosA; // perpendicular
+
+  // Crank pin world position
+  const crankAng = a - thetaDeg * Math.PI / 180;
+  const pinX = CX + Math.cos(crankAng)*s(r);
+  const pinY = CY + Math.sin(crankAng)*s(r);
+
+  // Piston pin position (constrained to radial axis)
+  const pd   = pistonR(thetaDeg);   // mm from disc centre
+  const pisX = CX + cosA*s(pd);
+  const pisY = CY + sinA*s(pd);
+
+  // ── T-bar position (FIXED size, position follows piston) ──
+  // offset so T-bar outer is at R_OUTER+pinProt when theta=0
+  const offset    = (R_OUTER + pinProt) - pistonR(0);
+  const barOuterR_k = pd + offset;        // kinematic outer radius
+  const barInnerR   = Math.max(barOuterR_k - T_BAR_THICK, R_OUTER - 40); // clamped at spacer outer edge
+  const barOuterR   = barInnerR + T_BAR_THICK; // constant thickness; outer stops inside disc when clamped
+
+  // T-head angular half-width
+  const tHeadHalf = tHeadPct * (Math.PI / N); // half of (tHeadPct * 72°)
+
+  // ── Guide rail lines (drawn first, behind T) ──
+  const railInnerR = s(r - 50);
+  const railOuterR = s(R_OUTER + 5);
+  const rOff = s(T_STEM_W/2 + 1);
+
+  c.strokeStyle='rgba(79,195,247,0.18)'; c.lineWidth=1; c.setLineDash([3,5]);
+  // top rail
+  c.beginPath();
+  c.moveTo(CX + cosA*railInnerR + cosP*rOff, CY + sinA*railInnerR + sinP*rOff);
+  c.lineTo(CX + cosA*railOuterR + cosP*rOff, CY + sinA*railOuterR + sinP*rOff);
+  c.stroke();
+  // bottom rail
+  c.beginPath();
+  c.moveTo(CX + cosA*railInnerR - cosP*rOff, CY + sinA*railInnerR - sinP*rOff);
+  c.lineTo(CX + cosA*railOuterR - cosP*rOff, CY + sinA*railOuterR - sinP*rOff);
+  c.stroke();
+  c.setLineDash([]);
+
+  // ── T stem body ──
+  // Stem runs from barInnerR inward to just past the piston pin; moves with the T
+  const stemTailR  = s(pd - 20);   // 20mm inward of piston pin
+  const stemHeadR  = s(barInnerR);
+  const stemLength = stemHeadR - stemTailR;
+  const stemW      = s(T_STEM_W);
+
+  c.save();
+  c.translate(CX, CY);
+  c.rotate(a);
+
+  // Stem rectangle
+  c.fillStyle  = 'rgba(160,220,255,0.13)';
+  c.strokeStyle= 'rgba(160,220,255,0.65)';
+  c.lineWidth  = 1.5;
+  c.beginPath();
+  c.roundRect(stemTailR, -stemW/2, stemLength, stemW, 2);
+  c.fill(); c.stroke();
+
+  c.restore();
+
+  // ── T crossbar (arc-shaped, fixed size) ──
+  c.save();
+  c.translate(CX, CY);
+
+  // Fill: retracted portion (inside disc) = acrylic colour
+  // Protruding portion (outside disc edge) = orange bolt colour
+  const discEdgePx = s(R_OUTER);
+  const barOutPx   = s(barOuterR);
+  const barInPx    = s(barInnerR);
+
+  // Full bar fill first (acrylic)
+  c.fillStyle  = 'rgba(160,220,255,0.15)';
+  c.strokeStyle= 'rgba(180,230,255,0.7)';
+  c.lineWidth  = 1.5;
+  c.beginPath();
+  c.arc(0,0, barOutPx,  a - tHeadHalf, a + tHeadHalf);
+  c.arc(0,0, barInPx,   a + tHeadHalf, a - tHeadHalf, true);
+  c.closePath();
+  c.fill(); c.stroke();
+
+  // Overlay orange only on the part that's past the disc edge
+  if(barOutPx > discEdgePx){
+    const overInnerPx = Math.max(barInPx, discEdgePx);
+    c.fillStyle  = 'rgba(255,107,53,0.82)';
+    c.strokeStyle= 'rgba(255,150,80,0.0)'; // no re-stroke, avoid double border
+    c.beginPath();
+    c.arc(0,0, barOutPx,    a - tHeadHalf, a + tHeadHalf);
+    c.arc(0,0, overInnerPx, a + tHeadHalf, a - tHeadHalf, true);
+    c.closePath();
+    c.fill();
+
+    // Just the outer arc edge in orange
+    c.strokeStyle='rgba(255,160,80,0.9)'; c.lineWidth=1.5;
+    c.beginPath();
+    c.arc(0,0, barOutPx, a - tHeadHalf, a + tHeadHalf);
+    c.stroke();
+  }
+
+  c.restore();
+
+  // ── Crank arm ──
+  c.strokeStyle='rgba(255,165,60,0.8)'; c.lineWidth=4; c.lineCap='round';
+  c.beginPath(); c.moveTo(CX,CY); c.lineTo(pinX,pinY); c.stroke();
+
+  // ── Connecting rod ──
+  c.strokeStyle='rgba(255,215,60,0.88)'; c.lineWidth=16; c.lineCap='round';
+  c.beginPath(); c.moveTo(pinX,pinY); c.lineTo(pisX,pisY); c.stroke();
+
+  // ── Pins ──
+  c.fillStyle='rgba(255,200,70,1)'; c.strokeStyle='rgba(255,235,130,1)'; c.lineWidth=1.5;
+  c.beginPath(); c.arc(pinX,pinY, s(3.5),0,Math.PI*2); c.fill(); c.stroke();
+
+  c.fillStyle='rgba(79,195,247,0.9)'; c.strokeStyle='rgba(180,235,255,1)'; c.lineWidth=1.2;
+  c.beginPath(); c.arc(pisX,pisY, s(3),0,Math.PI*2); c.fill(); c.stroke();
+}
+
+// ── Shared guide blocks ────────────────────────────────────
+// 5 guides, each in the gap between two adjacent arms.
+// Left wall is flush with the right side of arm[i]'s T-stem;
+// right wall is flush with the left side of arm[i+1]'s T-stem.
+// Inner/outer edges follow the disc arcs.
+function drawGuides(c){
+  const guideRo  = s(R_OUTER - 40);
+  const guideRi  = s(R_OUTER - 100);
+  const halfStem = s(T_STEM_W / 2 + 5);  // +5mm gap so spacer is visually clear of stem
+
+  // t = radial distance along arm at which the offset wall meets an arc radius R:
+  // |(t·armDir + halfStem·armPerp)|² = halfStem² + t² = R²  →  t = sqrt(R²−halfStem²)
+  const t_i = Math.sqrt(guideRi*guideRi - halfStem*halfStem);
+  const t_o = Math.sqrt(guideRo*guideRo - halfStem*halfStem);
+
+  for(let i=0; i<N; i++){
+    const arm1 = (i     * (360/N) - 90) * Math.PI/180;
+    const arm2 = ((i+1) * (360/N) - 90) * Math.PI/180;
+
+    // Left wall: the face of arm1's T-stem that faces the guide (CW side of arm1)
+    // CW perp in screen coords = (-sin a, cos a)
+    const p1x = -Math.sin(arm1) * halfStem;
+    const p1y =  Math.cos(arm1) * halfStem;
+
+    // Right wall: the face of arm2's T-stem that faces the guide (CCW side of arm2)
+    // CCW perp in screen coords = (sin a, -cos a)
+    const p2x =  Math.sin(arm2) * halfStem;
+    const p2y = -Math.cos(arm2) * halfStem;
+
+    // Four corners (pixels, relative to disc centre)
+    const iLx = p1x + t_i*Math.cos(arm1),  iLy = p1y + t_i*Math.sin(arm1); // inner-left
+    const oLx = p1x + t_o*Math.cos(arm1),  oLy = p1y + t_o*Math.sin(arm1); // outer-left
+    const iRx = p2x + t_i*Math.cos(arm2),  iRy = p2y + t_i*Math.sin(arm2); // inner-right
+    const oRx = p2x + t_o*Math.cos(arm2),  oRy = p2y + t_o*Math.sin(arm2); // outer-right
+
+    const a_iL = Math.atan2(iLy, iLx);
+    const a_iR = Math.atan2(iRy, iRx);
+    const a_oR = Math.atan2(oRy, oRx);
+    const a_oL = Math.atan2(oLy, oLx);
+
+    c.save(); c.translate(CX, CY);
+
+    c.fillStyle   = 'rgba(255,193,7,0.12)';
+    c.strokeStyle = 'rgba(255,200,60,0.6)';
+    c.lineWidth   = 1.8;
+    c.beginPath();
+    c.arc(0, 0, guideRi, a_iL, a_iR);       // inner arc left→right (CW)
+    c.lineTo(oRx, oRy);                       // right wall along arm2 direction
+    c.arc(0, 0, guideRo, a_oR, a_oL, true);  // outer arc right→left (CCW)
+    c.closePath();                             // left wall along arm1 direction
+    c.fill(); c.stroke();
+
+    const mid = arm1 + (arm2 - arm1) / 2;
+    const lx  = Math.cos(mid) * (guideRo + s(10));
+    const ly  = Math.sin(mid) * (guideRo + s(10));
+    c.fillStyle='rgba(255,200,60,0.5)'; c.font='8px Share Tech Mono'; c.textAlign='center';
+    c.fillText('G'+(i+1), lx, ly+3);
+
+    c.restore();
+  }
+}
+
+// ── Main draw ──────────────────────────────────────────────
+function drawMotion(){
+  const c = ctx;
+  c.clearRect(0,0,W,H);
+
+  // Grid
+  c.strokeStyle='rgba(255,255,255,0.018)'; c.lineWidth=1;
+  for(let i=0;i<W;i+=26){c.beginPath();c.moveTo(i,0);c.lineTo(i,H);c.stroke();}
+  for(let i=0;i<H;i+=26){c.beginPath();c.moveTo(0,i);c.lineTo(W,i);c.stroke();}
+
+  // ── Outer disc ──
+  const gO = c.createRadialGradient(CX,CY,0,CX,CY,s(R_OUTER));
+  gO.addColorStop(0,'rgba(100,170,220,0.04)');
+  gO.addColorStop(1,'rgba(70,140,200,0.09)');
+  c.fillStyle=gO;
+  c.beginPath(); c.arc(CX,CY,s(R_OUTER),0,Math.PI*2); c.fill();
+
+  // Glow ring
+  c.strokeStyle='rgba(79,195,247,0.10)'; c.lineWidth=s(8);
+  c.beginPath(); c.arc(CX,CY,s(R_OUTER),0,Math.PI*2); c.stroke();
+  c.strokeStyle='rgba(140,215,255,0.5)'; c.lineWidth=2;
+  c.beginPath(); c.arc(CX,CY,s(R_OUTER),0,Math.PI*2); c.stroke();
+
+  // Inner reference rings
+  c.strokeStyle='rgba(79,195,247,0.06)'; c.lineWidth=1; c.setLineDash([2,5]);
+  c.beginPath(); c.arc(CX,CY,s(130),0,Math.PI*2); c.stroke();
+  c.beginPath(); c.arc(CX,CY,s(165),0,Math.PI*2); c.stroke();
+  c.setLineDash([]);
+
+  // Slot openings in disc edge (where T-stems slide through)
+  for(let i=0;i<N;i++){
+    const a=(i*(360/N)-90)*Math.PI/180;
+    c.strokeStyle='rgba(79,195,247,0.25)'; c.lineWidth=s(T_STEM_W+2);
+    c.lineCap='butt';
+    c.beginPath();
+    c.moveTo(CX+Math.cos(a)*s(R_OUTER-8), CY+Math.sin(a)*s(R_OUTER-8));
+    c.lineTo(CX+Math.cos(a)*s(R_OUTER+4), CY+Math.sin(a)*s(R_OUTER+4));
+    c.stroke();
+    c.lineCap='round';
+  }
+
+  // ── Guide blocks ──
+  drawGuides(c);
+
+  // ── 5 T-arms ──
+  for(let i=0;i<N;i++){
+    drawTArm(c, i*(360/N)-90, theta);
+  }
+
+  // ── Central crank disc (rotates with theta) ──
+  c.save(); c.translate(CX,CY); c.rotate(-theta*Math.PI/180);
+
+  const gCD = c.createRadialGradient(0,0,0,0,0,s(R_CRANK));
+  gCD.addColorStop(0,'rgba(255,175,55,0.20)');
+  gCD.addColorStop(1,'rgba(255,125,35,0.07)');
+  c.fillStyle=gCD; c.strokeStyle='rgba(255,165,60,0.82)'; c.lineWidth=2;
+  c.beginPath(); c.arc(0,0,s(R_CRANK),0,Math.PI*2); c.fill(); c.stroke();
+
+  c.strokeStyle='rgba(255,165,60,0.18)'; c.lineWidth=1;
+  c.beginPath(); c.arc(0,0,s(R_CRANK*0.55),0,Math.PI*2); c.stroke();
+
+  for(let i=0;i<N;i++){
+    const a2=(i*72-90)*Math.PI/180;
+    c.strokeStyle='rgba(255,180,60,0.45)'; c.lineWidth=2;
+    c.beginPath(); c.moveTo(0,0); c.lineTo(Math.cos(a2)*s(r),Math.sin(a2)*s(r)); c.stroke();
+    c.fillStyle='rgba(255,200,60,0.20)'; c.strokeStyle='rgba(255,200,60,0.6)'; c.lineWidth=1.2;
+    c.beginPath(); c.arc(Math.cos(a2)*s(r),Math.sin(a2)*s(r),s(4),0,Math.PI*2); c.fill(); c.stroke();
+  }
+  // Motor shaft
+  c.fillStyle='rgba(55,65,85,0.95)'; c.strokeStyle='rgba(150,160,180,0.6)'; c.lineWidth=1.5;
+  c.beginPath(); c.arc(0,0,s(6),0,Math.PI*2); c.fill(); c.stroke();
+  c.strokeStyle='rgba(150,160,180,0.4)'; c.lineWidth=1;
+  c.beginPath(); c.moveTo(-s(5),s(4)); c.lineTo(s(5),s(4)); c.stroke();
+  c.restore();
+
+  // ── Protrusion annotation ──
+  // Show on top arm (pointing up)
+  const offset = (R_OUTER + pinProt) - pistonR(0);
+  const barOutNow = pistonR(theta) + offset; // current bar outer radius
+  const extNow = Math.max(0, barOutNow - R_OUTER);
+  const ang0 = -Math.PI/2;
+  if(extNow > 0.5){
+    const ex = CX + Math.cos(ang0)*(s(R_OUTER) + s(extNow));
+    const ey = CY + Math.sin(ang0)*(s(R_OUTER) + s(extNow));
+    const ee = CX + Math.cos(ang0)*s(R_OUTER);
+    const eeY= CY + Math.sin(ang0)*s(R_OUTER);
+    c.strokeStyle='rgba(255,107,53,0.7)'; c.lineWidth=1.5;
+    c.beginPath(); c.moveTo(ee,eeY); c.lineTo(ex,ey); c.stroke();
+    c.fillStyle='rgba(255,107,53,0.9)';
+    c.beginPath(); c.moveTo(ex-3,ey+5); c.lineTo(ex,ey); c.lineTo(ex+3,ey+5); c.fill();
+    c.fillStyle='rgba(255,130,60,1)'; c.font='bold 10px Share Tech Mono'; c.textAlign='left';
+    c.fillText(extNow.toFixed(1)+'mm', ex+s(8), ey+4);
+  } else {
+    // Show where it would be if locked
+    c.fillStyle='rgba(100,130,150,0.5)'; c.font='9px Share Tech Mono'; c.textAlign='left';
+    c.fillText('0mm (retracted)', CX+s(R_OUTER)+s(4), CY-s(R_OUTER));
+  }
+
+  // T-fill info
+  const arcDeg = (tHeadPct*72).toFixed(0);
+  const gapDeg = ((1-tHeadPct)*72).toFixed(0);
+  c.fillStyle='rgba(160,220,255,0.4)'; c.font='9px Share Tech Mono'; c.textAlign='right';
+  c.fillText('T='+arcDeg+'°  gap='+gapDeg+'°', W-10, H-12);
+
+  // ── Status ──
+  const badge = document.getElementById('badge');
+  if(theta<2)                  {badge.className='badge locked';  badge.textContent='⬡  LOCKED';}
+  else if(theta>thetaMax-2)   {badge.className='badge unlocked';badge.textContent='⬢  UNLOCKED';}
+  else              {badge.className='badge moving';  badge.textContent='↺  MOVING';}
+
+  document.getElementById('aDisp').textContent   = theta.toFixed(1)+'°';
+  document.getElementById('aSlider').value        = theta;
+  document.getElementById('extDisp').textContent  = extNow.toFixed(1)+' mm out';
+  document.getElementById('sR').textContent       = r+'mm';
+  document.getElementById('sL').textContent       = L+'mm';
+  document.getElementById('sStroke').textContent  = stroke().toFixed(1)+'mm';
+  document.getElementById('sProt').textContent    = pinProt+'mm';
+  document.getElementById('sTHead').textContent   = (tHeadPct*72).toFixed(1)+'° each';
+  document.getElementById('sGap').textContent     = ((1-tHeadPct)*72).toFixed(1)+'° each';
+}
+
+// ── Dims tab ───────────────────────────────────────────────
+function drawDims(){
+  const c=ctx;
+  c.clearRect(0,0,W,H); c.fillStyle='#050810'; c.fillRect(0,0,W,H);
+  c.strokeStyle='rgba(79,195,247,0.03)'; c.lineWidth=1;
+  for(let i=0;i<W;i+=20){c.beginPath();c.moveTo(i,0);c.lineTo(i,H);c.stroke();}
+  for(let i=0;i<H;i+=20){c.beginPath();c.moveTo(0,i);c.lineTo(W,i);c.stroke();}
+
+  // Draw at locked position (theta=0)
+  c.strokeStyle='rgba(140,210,255,0.22)'; c.lineWidth=1.5; c.setLineDash([5,5]);
+  c.beginPath(); c.arc(CX,CY,s(R_OUTER),0,Math.PI*2); c.stroke(); c.setLineDash([]);
+  c.strokeStyle='rgba(255,165,60,0.4)'; c.lineWidth=1.5;
+  c.beginPath(); c.arc(CX,CY,s(R_CRANK),0,Math.PI*2); c.stroke();
+
+  // Draw guides faintly
+  drawGuides(c);
+
+  // Draw one arm pointing up, locked
+  drawTArm(c, -90, 0);
+
+  // Faint other arm stubs
+  for(let i=1;i<N;i++){
+    const ang2=(i*72-90)*Math.PI/180;
+    c.strokeStyle='rgba(255,165,60,0.12)'; c.lineWidth=2;
+    c.beginPath(); c.moveTo(CX,CY);
+    c.lineTo(CX+Math.cos(ang2)*s(r), CY+Math.sin(ang2)*s(r));
+    c.stroke();
+  }
+
+  function dim(x1,y1,x2,y2,label,side=1,off=14){
+    const dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy);
+    const nx=-dy/len*off*side, ny=dx/len*off*side;
+    c.strokeStyle='rgba(255,193,7,0.5)'; c.lineWidth=1; c.setLineDash([2,3]);
+    c.beginPath(); c.moveTo(x1+nx,y1+ny); c.lineTo(x2+nx,y2+ny); c.stroke();
+    c.setLineDash([]);
+    c.beginPath();c.moveTo(x1,y1);c.lineTo(x1+nx*1.6,y1+ny*1.6);c.stroke();
+    c.beginPath();c.moveTo(x2,y2);c.lineTo(x2+nx*1.6,y2+ny*1.6);c.stroke();
+    c.fillStyle='rgba(255,193,7,0.9)'; c.font='bold 10px Share Tech Mono'; c.textAlign='center';
+    c.fillText(label,(x1+x2)/2+nx*2.8,(y1+y2)/2+ny*2.8+4);
+  }
+
+  dim(CX,CY, CX+s(R_OUTER),CY,      'R=200mm outer', -1, 18);
+  dim(CX,CY, CX+s(R_CRANK),CY,      'R=50mm crank',  -1, 36);
+  dim(CX,CY, CX,CY-s(r),            'r='+r+'mm pin',  1, 28);
+  dim(CX,CY-s(r), CX,CY-s(r+L),     'L='+L+'mm rod',  1, 28);
+
+  // T-bar dims
+  const tHalf=(tHeadPct*(Math.PI/N));
+  const barOut = s(R_OUTER+pinProt);
+  const barIn  = barOut - s(T_BAR_THICK);
+  dim(CX, CY-barOut, CX, CY-s(R_OUTER), pinProt+'mm protrusion', 1, 30);
+  dim(CX, CY-barOut, CX, CY-barIn,      T_BAR_THICK+'mm bar',    1, 48);
+
+  // T-head angular arc
+  c.strokeStyle='rgba(160,220,255,0.7)'; c.lineWidth=1.5;
+  c.beginPath(); c.arc(CX,CY, barOut+s(8), -Math.PI/2-tHalf, -Math.PI/2+tHalf); c.stroke();
+  c.fillStyle='rgba(160,220,255,0.8)'; c.font='bold 10px Share Tech Mono'; c.textAlign='center';
+  c.fillText((tHeadPct*72).toFixed(0)+'° T-head', CX-s(50), CY-barOut-s(12));
+
+  // Stroke
+  const lockY   = CY-s(pistonR(0));
+  const unlockY = CY-s(pistonR(90));
+  dim(CX+s(22),lockY, CX+s(22),unlockY, stroke().toFixed(0)+'mm stroke', 1, 16);
+
+  c.fillStyle='rgba(79,195,247,0.75)'; c.font='bold 11px Rajdhani'; c.textAlign='center';
+  c.fillText('DIMENSION VIEW · θ=0° (LOCKED) · mm', CX, 22);
+}
+
+// ── Build tab ──────────────────────────────────────────────
+function drawBuild(){
+  const c=ctx; c.clearRect(0,0,W,H);
+  c.fillStyle='#050810'; c.fillRect(0,0,W,H);
+  c.strokeStyle='rgba(79,195,247,0.03)'; c.lineWidth=1;
+  for(let i=0;i<W;i+=20){c.beginPath();c.moveTo(i,0);c.lineTo(i,H);c.stroke();}
+  for(let i=0;i<H;i+=20){c.beginPath();c.moveTo(0,i);c.lineTo(W,i);c.stroke();}
+
+  const layers=[
+    {y:470,col:'rgba(90,160,210,0.10)',edge:'rgba(90,170,220,0.50)',label:'BASE DISC · Ø400mm · 3mm Perspex'},
+    {y:400,col:'rgba(70,140,190,0.08)',edge:'rgba(70,155,200,0.40)',label:'GUIDE LAYER · 5× guide blocks + rail walls · 3mm'},
+    {y:330,col:'rgba(120,190,240,0.07)',edge:'rgba(120,200,250,0.35)',label:'COVER DISC · Ø400mm · T-stem slots · 3mm'},
+  ];
+  layers.forEach((l,i)=>{
+    c.fillStyle=l.col; c.strokeStyle=l.edge; c.lineWidth=2;
+    c.beginPath(); c.ellipse(280,l.y,224,30,0,0,Math.PI*2); c.fill(); c.stroke();
+    c.fillStyle=l.edge.replace('0.50','0.90').replace('0.40','0.82').replace('0.35','0.72');
+    c.font='bold 9px Share Tech Mono'; c.textAlign='center';
+    c.fillText(l.label,280,l.y+4);
+    if(i<2){
+      c.strokeStyle='rgba(79,195,247,0.07)'; c.lineWidth=1; c.setLineDash([2,4]);
+      c.beginPath();c.moveTo(56,l.y);c.lineTo(56,l.y-70);c.stroke();
+      c.beginPath();c.moveTo(504,l.y);c.lineTo(504,l.y-70);c.stroke();
+      c.setLineDash([]);
+    }
+  });
+
+  c.fillStyle='rgba(255,165,60,0.15)'; c.strokeStyle='rgba(255,165,60,0.65)'; c.lineWidth=1.5;
+  c.beginPath(); c.ellipse(280,398,44,7,0,0,Math.PI*2); c.fill(); c.stroke();
+  c.fillStyle='rgba(255,165,60,0.8)'; c.font='8px Share Tech Mono'; c.textAlign='left';
+  c.fillText('CRANK DISC Ø100mm — 5× M3 pins @ r='+r+'mm',328,402);
+
+  const parts=[
+    ['T-SLIDER ×5',       'Stem: ~'+T_STEM_W+'×'+(L+20)+'mm + arc crossbar',  'Crossbar: '+T_BAR_THICK+'mm thick × '+(tHeadPct*72).toFixed(0)+'° arc. One rigid piece.'],
+    ['GUIDE BLOCK ×5',    'Arc segment, ~20mm radial × '+(((1-tHeadPct)*72)*0.72).toFixed(0)+'° arc', 'Sits in gap between T-heads. Glued to base.'],
+    ['RAIL WALLS ×10',    '~5×75mm strips, 3mm Perspex',     '2 per arm, either side of stem. Guides the T stem.'],
+    ['CRANK DISC ×1',     'Ø100mm circle, 3mm',              '5× M3 holes at r='+r+'mm, exactly 72° apart.'],
+    ['CONNECT ROD ×5',    '~'+(L+15)+'×9mm strip',           'M3 clearance holes at each end. Rod length = '+L+'mm c-c.'],
+    ['ALLY HUB ×1',       '30×30mm × 2mm aluminium',         'D-bore 5mm shaft + 4×M3. Best motor connection.'],
+    ['M3 BOLTS ×15',      'M3×20 + nylon washers',           '5 crank pins + 5 piston pins + 5 centre pivots.'],
+  ];
+
+  c.fillStyle='rgba(79,195,247,0.7)'; c.font='bold 11px Rajdhani'; c.textAlign='left';
+  c.fillText('PARTS & BUILD NOTES',32,50);
+  parts.forEach((p,i)=>{
+    const y=68+i*31;
+    c.fillStyle='rgba(140,210,255,0.85)'; c.font='bold 9px Share Tech Mono'; c.fillText('▸ '+p[0],32,y);
+    c.fillStyle='rgba(255,193,7,0.75)'; c.font='9px Share Tech Mono'; c.fillText(p[1],32,y+11);
+    c.fillStyle='rgba(90,130,150,0.8)'; c.font='8px Share Tech Mono'; c.fillText(p[2],32,y+22);
+  });
+
+  c.fillStyle='rgba(102,187,106,0.7)'; c.font='bold 9px Share Tech Mono'; c.textAlign='center';
+  c.fillText('KEY: T is ONE RIGID PIECE — it only slides radially. Size never changes.',280,300);
+  c.fillStyle='rgba(255,107,53,0.6)';
+  c.fillText('5 guides serve 10 rail faces (each guide shared by 2 adjacent T-sliders)',280,316);
+
+  c.fillStyle='rgba(79,195,247,0.6)'; c.font='bold 12px Rajdhani';
+  c.fillText('EXPLODED BUILD VIEW',280,22);
+}
+
+// ── Controls ───────────────────────────────────────────────
+function setTab(t){
+  tab=t;
+  document.querySelectorAll('.tab').forEach((el,i)=>{
+    el.classList.toggle('active',['motion','dims','build'][i]===t);
+  });
+  redraw();
+}
+function redraw(){
+  if(tab==='motion') drawMotion();
+  else if(tab==='dims') drawDims();
+  else drawBuild();
+}
+function updateGeo(){
+  r          = +document.getElementById('rSlider').value;
+  L          = +document.getElementById('lSlider').value;
+  tHeadPct   = +document.getElementById('twSlider').value/100;
+  pinProt    = +document.getElementById('ppSlider').value;
+  if(L<r+5){L=r+5; document.getElementById('lSlider').value=L;}
+  document.getElementById('rDisp').textContent  = r+'mm';
+  document.getElementById('lDisp').textContent  = L+'mm';
+  document.getElementById('twDisp').textContent = (tHeadPct*100).toFixed(0)+'%';
+  document.getElementById('ppDisp').textContent = pinProt+'mm';
+  thetaMax = computeThetaMax();
+  document.getElementById('aSlider').max = thetaMax;
+  document.getElementById('openLabel').textContent = thetaMax.toFixed(0)+'° OPEN';
+  if(theta > thetaMax) theta = thetaMax;
+  redraw();
+}
+function manual(v){animTarget=null;cycling=false;theta=+v;redraw();}
+function animTo(t){cycling=false;animTarget=t;if(!raf)raf=requestAnimationFrame(frame);}
+function toggleCycle(){cycling=!cycling;animTarget=null;if(cycling&&!raf)raf=requestAnimationFrame(frame);}
+
+let lastT2=0;
+function frame(ts){
+  const dt=Math.min(ts-lastT2,50); lastT2=ts;
+  if(animTarget!==null){
+    const d=animTarget-theta;
+    theta+=Math.sign(d)*Math.min(Math.abs(d),dt*0.10);
+    if(Math.abs(d)<0.3){theta=animTarget;animTarget=null;}
+  } else if(cycling){
+    theta+=cycleDir*dt*0.055;
+    if(theta>=thetaMax){theta=thetaMax;cycleDir=-1;}
+    if(theta<=0) {theta=0; cycleDir= 1;}
+  }
+  redraw();
+  if(animTarget!==null||cycling) raf=requestAnimationFrame(frame);
+  else raf=null;
+}
+
+thetaMax = computeThetaMax();
+document.getElementById('aSlider').max = thetaMax;
+document.getElementById('openLabel').textContent = thetaMax.toFixed(0)+'° OPEN';
+drawMotion();
+</script>
+</body>
+</html>

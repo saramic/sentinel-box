@@ -49,6 +49,12 @@
 
 ---
 
+## Mon 11 May 2026
+
+- played around with a vault door design
+
+![](docs/assets/20260511_lock_unlock_vault_door.gif)
+
 ## Fri 1 May 2026
 
 ### Uart comms
