@@ -48,26 +48,26 @@ P3.5     ────────────  CS   (active-low, idle HIGH)
 
 ### Pin summary
 
-| Signal         | MAX32630FTHR | Direction | Notes |
-|----------------|-------------|-----------|-------|
-| Encoder CLK    | P5.3        | Input ↑   | pull-up, quadrature A |
-| Encoder DT     | P5.4        | Input ↑   | pull-up, quadrature B |
-| Encoder SW     | P5.5        | Input ↑   | pull-up, active-low push (AIN0) |
-| MAX7219 DIN    | P3.3        | Output    | bit-bang SPI MOSI |
-| MAX7219 CLK    | P3.4        | Output    | bit-bang SPI clock |
-| MAX7219 CS     | P3.5        | Output    | active-low chip select |
-| RGB LED R      | P2.4        | Output    | active-low open-drain |
-| RGB LED G      | P2.5        | Output    | active-low open-drain |
-| RGB LED B      | P2.6        | Output    | active-low open-drain |
+| Signal         | MAX32630FTHR | Direction | Notes                           |
+|----------------|--------------|-----------|---------------------------------|
+| Encoder CLK    | P5.3         | Input ↑   | pull-up, quadrature A           |
+| Encoder DT     | P5.4         | Input ↑   | pull-up, quadrature B           |
+| Encoder SW     | P5.5         | Input ↑   | pull-up, active-low push (AIN0) |
+| MAX7219 DIN    | P3.3         | Output    | bit-bang SPI MOSI               |
+| MAX7219 CLK    | P3.4         | Output    | bit-bang SPI clock              |
+| MAX7219 CS     | P3.5         | Output    | active-low chip select          |
+| RGB LED R      | P2.4         | Output    | active-low open-drain           |
+| RGB LED G      | P2.5         | Output    | active-low open-drain           |
+| RGB LED B      | P2.6         | Output    | active-low open-drain           |
 
 ## Behaviour
 
-| Action | Result |
-|--------|--------|
-| Power on | Display shows **0**, blue LED on |
-| Turn CW | Value increments 0 → 1 → … → F → 0 (wraps) |
-| Turn CCW | Value decrements 0 → F → … → 1 → 0 (wraps) |
-| Press shaft | Resets to **0** |
+| Action      | Result                                      |
+|-------------|---------------------------------------------|
+| Power on    | Display shows **0**, blue LED on            |
+| Turn CW     | Value increments 0 → 1 → … → F → 0 (wraps)  |
+| Turn CCW    | Value decrements 0 → F → … → 1 → 0 (wraps)  |
+| Press shaft | Resets to **0**                             |
 
 If rotation direction is reversed, swap the CLK and DT wires (or swap `enc_clk`
 and `enc_dt` pin definitions in `main.c`).

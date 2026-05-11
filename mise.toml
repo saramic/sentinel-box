@@ -129,6 +129,39 @@ run = """
 """
 
 #
+# Experiments in stepper motors - LPSDK 🅲
+#
+[tasks."cbu:in_stepper_motors_LPSDK"]
+description = "clean-build-upload stepper motors LPSDK"
+run = """
+  mise run clean:in_stepper_motors_LPSDK
+  mise run build:in_stepper_motors_LPSDK
+  mise run upload:in_stepper_motors_LPSDK
+"""
+
+[tasks."clean:in_stepper_motors_LPSDK"]
+description = "clean stepper motors LPSDK"
+dir = "experiments/in_stepper_motors"
+run = "make clean"
+
+[tasks."build:in_stepper_motors_LPSDK"]
+description = "build stepper motors LPSDK firmware"
+dir = "experiments/in_stepper_motors"
+run = "make"
+
+[tasks."upload:in_stepper_motors_LPSDK"]
+description = "upload stepper motors LPSDK firmware"
+dir = "experiments/in_stepper_motors"
+run = """
+    openocd \
+        -s /usr/local/share/openocd/scripts \
+        -f interface/cmsis-dap.cfg \
+        -f target/max3263x.cfg \
+        -c 'reset_config srst_only' \
+        -c 'program build/in_stepper_motors_lpsdk.elf verify reset exit'
+"""
+
+#
 # Experiments in blink - Rust 🦀
 #
 [tasks."clean:in_blink_rust"]
