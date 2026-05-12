@@ -40,7 +40,15 @@ prototype of one arm.
 Above are 5 "T-shaped" pins running through the motion of lock and unlock
 driven by a central round piece.
 
-TODO 1 pin model
+<img src="/sentinel-box/assets/20260512_perspex_model.gif"
+  alt="perspex model going through motion" width="740" />
+
+<video width="740" controls>
+  <source src="/sentinel-box/assets/20260512_perspex_model.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+A perspex model to iron out tolerances and my construction limitations.
 
 ## Stepper motor
 
