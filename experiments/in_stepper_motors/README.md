@@ -1,10 +1,12 @@
 # in_stepper_motors
 
 Drives a **ULN2003 28BYJ-48 4-phase stepper motor** from the MAX32630FTHR using
-the Maxim LPSDK. On power-up the output shaft rotates 360° forward then 360°
-reverse, repeated 3 times, then stops (red LED). Reset the board to run again.
+the Maxim LPSDK. On power-up:
 
-Half-step mode is used for smoother rotation (8 microstates per electrical cycle).
+1. **Half-step** (4076 steps/rev, 5 RPM) — 360° forward then 360° reverse
+2. **Wave drive** (2038 steps/rev, 15 RPM) — 360° forward then 360° reverse
+
+Then stops (red LED). Reset the board to repeat.
 
 ## Hardware
 
@@ -97,17 +99,49 @@ backlash and the motor vibrates without moving. Call `stepper_off()` explicitly
 if you want to save power — but only do so well before the next move starts.
 The motor body will run warm when held; this is normal for this motor class.
 
-**Step mode and speed**
-Two modes are available — switch by editing the two `#define` lines near the top
-of `main.c`:
+**Coil layout and step sequences**
 
-| Mode              | `#define`           | Steps/rev | Delay  | Speed   |           |
-|-------------------|---------------------|-----------|--------|---------|-----------|
-| Half-step         | `STEPPER_HALF_STEP` | 4096      | 1.5 ms | ~10 RPM | ← default |
-| Full-step (wave)  | `STEPPER_FULL_STEP` | 2048      | 1.5 ms | ~20 RPM |           |
+The 28BYJ-48 ULN2003 pins IN1–IN4 map to physically adjacent coils in order
+around the stator. The Arduino Stepper library confirms this — it passes the
+pins as `(IN1, IN3, IN2, IN4)` into a generic bipolar step table, which after
+remapping resolves to adjacent pairs IN1+IN2, IN2+IN3, IN3+IN4, IN4+IN1.
 
-`STEP_DELAY_US` can also be tuned independently of the mode. Below ~1000 µs
-the 28BYJ-48 gearbox stalls. Above ~10 ms is just slow.
+```
+              IN1  (0°)
+               |
+  IN4 ---------+--------- IN2  (90° CW)
+  (270°)       |          
+              IN3  (180°)
+
+Clockwise:         IN1 → IN2 → IN3 → IN4 → IN1 ...
+Counter-clockwise: IN1 → IN4 → IN3 → IN2 → IN1 ...
+```
+
+**Wave drive** (single-coil, 2038 steps/rev, 15 RPM at 1,963 µs/step — 3× faster than half-step; 20 RPM stalls):
+
+| Step | IN1 | IN2 | IN3 | IN4 | Active |
+|-----:|----:|----:|----:|----:|-------:|
+| 0    | H   | L   | L   | L   | IN1    |
+| 1    | L   | H   | L   | L   | IN2    |
+| 2    | L   | L   | H   | L   | IN3    |
+| 3    | L   | L   | L   | H   | IN4    |
+
+**Half-step** (4076 steps/rev, 5 RPM at 2,944 µs/step):
+
+| Step | IN1 | IN2 | IN3 | IN4 | Active   |
+|-----:|----:|----:|----:|----:|---------:|
+| 0    | H   | L   | L   | L   | IN1      |
+| 1    | H   | H   | L   | L   | IN1+IN2  |
+| 2    | L   | H   | L   | L   | IN2      |
+| 3    | L   | H   | H   | L   | IN2+IN3  |
+| 4    | L   | L   | H   | L   | IN3      |
+| 5    | L   | L   | H   | H   | IN3+IN4  |
+| 6    | L   | L   | L   | H   | IN4      |
+| 7    | H   | L   | L   | H   | IN4+IN1  |
+
+Steps/rev uses the accurate gear ratio 32 × 63.68 ≈ 2038 (wave) / 4076
+(half-step), matching the Arduino `stepsPerRevolution = 2038` convention.
+`step_delay_us` can be tuned in `main.c`. Below ~1000 µs the gearbox stalls.
 
 **Accuracy and backlash**
 The 28BYJ-48 gearbox has measurable backlash. 1024 half-steps targets 90° but
@@ -121,16 +155,17 @@ swap any two IN wires to reverse it.
 
 **Gear ratio**
 The 28BYJ-48 datasheet quotes 1:64 but the actual ratio is closer to 1:63.68.
-`STEPS_PER_REV = 4096` (64 × 64 half-steps) is the common convention. For very
-accurate positioning you can calibrate with `STEPS_PER_REV = 4076`.
+The accurate steps/rev is 4076 (half-step) / 2038 (wave drive), based on the
+real gear ratio 32 × 63.68. The Arduino library uses `stepsPerRevolution = 2038`
+for the same reason.
 
 ## Behaviour
 
-| LED colour | Meaning                                              |
-|------------|------------------------------------------------------|
-| Green      | Rotating 360° forward                                |
-| Blue       | Rotating 360° reverse                                |
-| Red        | Done (3 cycles complete) — reset board to run again  |
+| LED colour | Meaning                                                    |
+|------------|------------------------------------------------------------|
+| Green      | Rotating 360° forward (either mode)                        |
+| Blue       | Rotating 360° reverse (either mode)                        |
+| Red        | Done (both modes complete) — reset board to run again      |
 
 ## Build and upload
 

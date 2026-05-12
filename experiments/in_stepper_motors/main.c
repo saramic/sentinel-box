@@ -54,66 +54,108 @@ static void led_set(int r, int g, int b)
 }
 
 /* -------------------------------------------------------------------------
- * Stepper mode — uncomment exactly one line.
- *
- * Mode        Steps/rev   Delay    Speed
- * HALF_STEP   4096        1.5 ms  ~10 RPM  smooth, reliable  ← default
- * FULL_STEP   2048        1.5 ms  ~20 RPM  faster, less smooth
- *
- * STEP_DELAY_US can be tuned independently. Below ~1000 µs the 28BYJ-48 stalls.
- * ------------------------------------------------------------------------- */
-#define STEPPER_HALF_STEP
-/* #define STEPPER_FULL_STEP */
-
-#if defined(STEPPER_HALF_STEP)
-#  define STEP_DELAY_US   1500
-#  define STEPS_PER_REV   4096
-#  define STEP_TABLE_LEN  8
-static const uint8_t step_table[8][4] = {
-    { 1, 0, 0, 0 },
-    { 1, 1, 0, 0 },
-    { 0, 1, 0, 0 },
-    { 0, 1, 1, 0 },
-    { 0, 0, 1, 0 },
-    { 0, 0, 1, 1 },
-    { 0, 0, 0, 1 },
-    { 1, 0, 0, 1 },
-};
-#elif defined(STEPPER_FULL_STEP)
-#  define STEP_DELAY_US   1500
-#  define STEPS_PER_REV   2048
-#  define STEP_TABLE_LEN  4
-/* Wave drive: same single-coil states as half-step, just skipping the in-between */
-static const uint8_t step_table[4][4] = {
-    { 1, 0, 0, 0 },
-    { 0, 1, 0, 0 },
-    { 0, 0, 1, 0 },
-    { 0, 0, 0, 1 },
-};
-#else
-#  error "Uncomment either STEPPER_HALF_STEP or STEPPER_FULL_STEP above"
-#endif
-
-/* -------------------------------------------------------------------------
  * 28BYJ-48 stepper via ULN2003 driver board.
  *
  * Pin mapping (avoids all fingerprint-LPSDK wiring on P3.0-P3.5, P5.3-P5.5):
  *   IN1 = P5.2   IN2 = P5.1   IN3 = P5.0   IN4 = P4.0
  *
- * Forward (+steps): table index advances each step
- * Reverse  (-steps): table index retreats each step
- * Gear ratio ≈ 64:1 → STEPS_PER_REV steps per output-shaft revolution
+ * Physical coil layout (viewed from shaft end, CW order):
+ *
+ *              IN1  (0°)
+ *               |
+ *   IN4 --------+-------- IN2  (IN2 at 90° CW from IN1)
+ *  (270°)       |        (90°)
+ *              IN3
+ *             (180°)
+ *
+ * Adjacent pairs going CW: IN1→IN2→IN3→IN4→IN1
+ * The Arduino Stepper library confirms this — it passes pins as
+ * (IN1, IN3, IN2, IN4) into a generic bipolar step table, which resolves
+ * to the same adjacent pairs: IN1+IN2, IN2+IN3, IN3+IN4, IN4+IN1.
+ *
+ * Wave drive (single-coil), 2038 steps/rev:
+ *   step  {IN1,IN2,IN3,IN4}
+ *     0    1  0  0  0      IN1
+ *     1    0  1  0  0      IN2
+ *     2    0  0  1  0      IN3
+ *     3    0  0  0  1      IN4
+ *
+ * Half-step, 4076 steps/rev:
+ *   step  {IN1,IN2,IN3,IN4}
+ *     0    1  0  0  0      IN1
+ *     1    1  1  0  0      IN1+IN2
+ *     2    0  1  0  0      IN2
+ *     3    0  1  1  0      IN2+IN3
+ *     4    0  0  1  0      IN3
+ *     5    0  0  1  1      IN3+IN4
+ *     6    0  0  0  1      IN4
+ *     7    1  0  0  1      IN4+IN1
+ *
+ * Gear ratio: 32 internal steps × 63.68 ≈ 2037.9 → use 2038 full / 4076 half.
+ * Reverse (-steps): table index retreats instead of advances.
+ * Coils stay energised after a move — holds gearbox meshed for clean reversal.
  * ------------------------------------------------------------------------- */
 static const gpio_cfg_t s_in1 = { PORT_5, PIN_2, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL };
 static const gpio_cfg_t s_in2 = { PORT_5, PIN_1, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL };
 static const gpio_cfg_t s_in3 = { PORT_5, PIN_0, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL };
 static const gpio_cfg_t s_in4 = { PORT_4, PIN_0, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL };
 
+static const uint8_t wave_step[4][4] = {
+    { 1, 0, 0, 0 },   /* IN1        */
+    { 0, 1, 0, 0 },   /* IN2        */
+    { 0, 0, 1, 0 },   /* IN3        */
+    { 0, 0, 0, 1 },   /* IN4        */
+};
+
+static const uint8_t half_step[8][4] = {
+    { 1, 0, 0, 0 },   /* IN1        */
+    { 1, 1, 0, 0 },   /* IN1+IN2    */
+    { 0, 1, 0, 0 },   /* IN2        */
+    { 0, 1, 1, 0 },   /* IN2+IN3    */
+    { 0, 0, 1, 0 },   /* IN3        */
+    { 0, 0, 1, 1 },   /* IN3+IN4    */
+    { 0, 0, 0, 1 },   /* IN4        */
+    { 1, 0, 0, 1 },   /* IN4+IN1    */
+};
+
+/* active mode — switch with stepper_use_wave() / stepper_use_half_step() */
+static const uint8_t (*active_table)[4] = half_step;
+static int      table_len     = 8;
+static uint32_t step_delay_us  = 2944;   /* 5 RPM – 60,000,000 / 4076 / 5 */
+static int      steps_per_rev  = 4076;   /* 32 × 63.68 × 2 */
+
 static int step_idx = 0;
+
+/* -------------------------------------------------------------------------
+ * Step delay formula (from Arduino Stepper library):
+ *   step_delay_us = 60,000,000 / steps_per_rev / RPM
+ *
+ * Half-step (4076 steps/rev):         Wave drive (2038 steps/rev):
+ *   5 RPM  → 2,944 µs                  10 RPM → 2,944 µs
+ *  10 RPM  → 1,472 µs                  15 RPM → 1,963 µs  ← max reliable
+ *                                       20 RPM → 1,472 µs  ← stalls
+ * ------------------------------------------------------------------------- */
+static void stepper_use_half_step(void)
+{
+    active_table   = half_step;
+    table_len      = 8;
+    step_delay_us  = 2944;   /* 5 RPM – 60,000,000 / 4076 / 5 */
+    steps_per_rev  = 4076;   /* 32 × 63.68 × 2 */
+    step_idx       = 0;
+}
+
+static void stepper_use_wave(void)
+{
+    active_table   = wave_step;
+    table_len      = 4;
+    step_delay_us  = 1963;   /* 15 RPM – 60,000,000 / 2038 / 15 */
+    steps_per_rev  = 2038;   /* 32 × 63.68 */
+    step_idx       = 0;
+}
 
 static void stepper_apply(void)
 {
-    const uint8_t *s = step_table[step_idx];
+    const uint8_t *s = active_table[step_idx];
     s[0] ? GPIO_OutSet(&s_in1) : GPIO_OutClr(&s_in1);
     s[1] ? GPIO_OutSet(&s_in2) : GPIO_OutClr(&s_in2);
     s[2] ? GPIO_OutSet(&s_in3) : GPIO_OutClr(&s_in3);
@@ -136,46 +178,43 @@ static void stepper_init(void)
     GPIO_Config(&s_in4); GPIO_OutClr(&s_in4);
 }
 
-#define STEPS_90  (STEPS_PER_REV / 4)
-
-/* positive steps = forward, negative = reverse.
- * Coils stay energised after returning — keeps the gearbox meshed so direction
- * reversals start with torque rather than fighting backlash (vibration). */
+/* positive steps = forward (CW), negative = reverse (CCW) */
 static void stepper_move(int steps)
 {
     int dir = (steps > 0) ? 1 : -1;
     int n   = (steps > 0) ? steps : -steps;
     for (int i = 0; i < n; i++) {
-        step_idx = (step_idx + dir + STEP_TABLE_LEN) % STEP_TABLE_LEN;
+        step_idx = (step_idx + dir + table_len) % table_len;
         stepper_apply();
-        TMR_Delay(MXC_TMR0, USEC(STEP_DELAY_US));
+        TMR_Delay(MXC_TMR0, USEC(step_delay_us));
     }
 }
 
 /* -------------------------------------------------------------------------
- * Application: spin 90° left, pause 1 s, spin 90° right, pause 1 s, repeat.
- *
- * LED colours:
- *   Blue  — moving left  (reverse)
- *   Green — moving right (forward)
- *   Off   — pausing between moves
+ * Application:
+ *   1. Half-step  360° forward (green) then 360° reverse (blue) — ~10 RPM
+ *   2. Wave-drive 360° forward (green) then 360° reverse (blue) — ~20 RPM
+ *   Red LED + halt when done. Reset board to repeat.
  * ------------------------------------------------------------------------- */
 int main(void)
 {
     led_init();
     stepper_init();
 
-    for (int i = 0; i < 3; i++) {
-        led_set(0, 1, 0);              /* green: forward */
-        stepper_move(+STEPS_PER_REV);
-        TMR_Delay(MXC_TMR0, MSEC(500));
+    stepper_use_half_step();
+    led_set(0, 1, 0);
+    stepper_move(+steps_per_rev);
+    led_set(0, 0, 1);
+    stepper_move(-steps_per_rev);
+    TMR_Delay(MXC_TMR0, MSEC(500));
 
-        led_set(0, 0, 1);              /* blue: reverse */
-        stepper_move(-STEPS_PER_REV);
-        TMR_Delay(MXC_TMR0, MSEC(500));
-    }
+    stepper_use_wave();
+    led_set(0, 1, 0);
+    stepper_move(+steps_per_rev);
+    led_set(0, 0, 1);
+    stepper_move(-steps_per_rev);
 
     stepper_off();
-    led_set(1, 0, 0);                  /* red: done */
+    led_set(1, 0, 0);
     while (1) {}
 }
