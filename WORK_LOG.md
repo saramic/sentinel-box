@@ -49,6 +49,164 @@
 
 ---
 
+## Wed 13 May 2026
+
+### Bluetooth on the MAX32630FTHR — More Wiring Than You Think
+
+The board has a **PAN1326B** Bluetooth module soldered directly on it — no
+external module or extra wiring needed. Inside the PAN1326B is a **TI CC2564B**
+dual-mode BT/BLE chip. It talks to the MAX32630 via UART0, but getting it to
+respond involved several non-obvious steps.
+
+#### Mapping B — the crossover surprise
+
+UART0 on the MAX32630 has two pin mappings. On the FTHR board, the PAN1326B is
+wired so that P0.0 is the MCU's *receive* pin and P0.1 is *transmit* — the
+opposite of the UART0 default (Mapping A). Selecting **Mapping B** in the IOMAN
+configuration crossovers them automatically. Nothing in the Arduino world would
+surface this because `Serial0.begin()` just works — in bare-metal LPSDK you have
+to know to ask for it:
+
+```c
+const sys_cfg_uart_t ble_sys = {
+    .clk_scale = CLKMAN_SCALE_DIV_1,
+    .io_cfg    = IOMAN_UART(0, IOMAN_MAP_B, IOMAN_MAP_A, IOMAN_MAP_A, 1, 0, 0),
+};
+UART_Init(MXC_UART0, &ble_cfg, &ble_sys);
+while (MXC_IOMAN->uart0_ack != MXC_IOMAN->uart0_req) {}
+```
+
+#### The 1.8V pins
+
+All P0 and P1 pins connected to the BLE module run at **1.8V** VDDIO, not the
+3.3V VDDIOH rail used elsewhere on the board. In LPSDK, pins default to 1.8V
+unless you set bits in `use_vddioh_0/1`. So the right move is to confirm those
+bits are clear — 3.3V on a 1.8V input is a reliable way to get no response.
+
+#### Three steps to get 32kHz out of P1.7
+
+The BLE module needs a 32.768 kHz reference clock on P1.7. Enabling just the
+output bit (`PWR_PSEQ_32K_EN`) isn't enough — the crystal oscillator itself also
+needs to be started first:
+
+```c
+MXC_RTCCFG->clk_ctrl |= MXC_F_RTC_CLK_CTRL_NANO_EN;
+MXC_RTCCFG->osc_ctrl |= MXC_F_RTC_OSC_CTRL_OSC_WARMUP_ENABLE;
+MXC_PWRSEQ->reg4     |= MXC_F_PWRSEQ_REG4_PWR_PSEQ_32K_EN;
+TMR_Delay(MXC_TMR0, MSEC(50));
+```
+
+Skipping the first two lines gives you a valid GPIO voltage on P1.7 — just no
+clock signal. The module boots but never initialises its HCI UART properly.
+
+#### The CTS trap
+
+With hardware flow control enabled (`.cts = 1` in `uart_cfg_t`), the UART
+peripheral refuses to transmit while the CTS input (P0.2) is HIGH. During boot,
+the PAN1326B holds its RTS output HIGH — which feeds directly into P0.2. Result:
+every HCI command sits in the transmit buffer and never goes out. The fix is to
+**disable hardware CTS checking** and let the MCU transmit freely:
+
+```c
+const uart_cfg_t ble_cfg = {
+    .parity = UART_PARITY_DISABLE, .size = UART_DATA_SIZE_8_BITS,
+    .extra_stop = 0, .cts = 0, .rts = 0, .baud = 115200,
+};
+```
+
+The Arduino reference implementations quietly avoid this by never enabling
+hardware flow control in `HardwareSerial::begin()`. In LPSDK you get to discover
+it the hard way.
+
+#### The CC256XB service pack — LE needs firmware
+
+The CC2564B chip ships without any LE (Bluetooth Low Energy) subsystem firmware.
+After a plain HCI Reset, standard BLE commands like
+`HCI_LE_Set_Advertising_Parameters` (opcode `0x2006`) come back as "Unknown HCI
+Command". Before BLE works, a **service pack** of ~150 TI vendor-specific HCI
+commands must be uploaded.
+
+TI distributes this as `CC256XB-BT-SP`. The Bluetopia variant (`CC256XB.h`)
+packages all the commands as two C arrays — `BasePatch[]` and `LowEnergyPatch[]`
+— each a flat stream of raw HCI packets. Uploading is straightforward iteration:
+
+```c
+while (p + 4 <= end) {
+    unsigned int cmd_len = 4 + p[3];
+    hci_send(p, cmd_len);
+    hci_drain_event(200);
+    p += cmd_len;
+}
+```
+
+The last command in `LowEnergyPatch` is `0xFD5B` (LE enable). It takes
+noticeably longer than the others and its Command Complete event can still be
+sitting in the UART buffer when you send the follow-up HCI Reset. The symptom:
+`hci_reset()` receives `04 0E 04 01 5B FD 00` — a valid response, but for the
+wrong command. The fix is to loop in `hci_reset()` and skip any Command Complete
+that isn't for the Reset opcode `0x0C03`.
+
+The file is TI proprietary (TSPA licence) so it lives in
+`reference/CC256XB_BT_SP/` which is gitignored. The Makefile adds it to `IPATH`
+and gives a clear error with the TI download URL if it's missing:
+
+```makefile
+CC256XB_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../../reference/CC256XB_BT_SP/v1.8/Bluetopia)
+ifeq ($(wildcard $(CC256XB_DIR)/CC256XB.h),)
+  $(error CC256XB.h not found -- download TI CC256XB-BT-SP)
+endif
+```
+
+#### Serial debug via DAPLink — no extra hardware
+
+The CMSIS-DAP USB connection used for flashing with OpenOCD exposes **two** USB
+interfaces: the HID interface for the debugger, and a **CDC virtual COM port**
+bridged to UART1 (P2.0/P2.1) on the MAX32630. So the same USB cable you flash
+with is also your serial console:
+
+```sh
+screen /dev/tty.usbmodem* 115200
+```
+
+Adding `UART_Init(MXC_UART1, ...)` and a handful of `UART_Write()` calls gives
+printf-style debug output with zero extra hardware. This turned a blind "is it
+transmitting?" situation into a clear trace of every HCI command and response
+byte:
+
+```
+[HCI TX] 01 03 0C 00
+[HCI RX] 04 0E 04 01 03 0C 00
+[HCI] reset OK
+[CC256X] uploading patch...
+```
+
+A `mise run serial` task auto-finds the port and opens `screen`.
+
+#### Chrome Web Bluetooth scanner
+
+Chrome (and Edge) support the **Web Bluetooth API** — a page served from
+`localhost` can scan for and connect to nearby BLE peripherals without any
+native app. The device picker shows all advertising BLE devices:
+
+```js
+const device = await navigator.bluetooth.requestDevice({
+    acceptAllDevices: true,
+    optionalServices: ['generic_access']
+});
+const server = await device.gatt.connect();
+const services = await server.getPrimaryServices();
+```
+
+A small `ble_debug.html` in the experiment directory acts as both a "does it
+advertise?" check (SentinelBox lights up in the device list) and a full GATT
+browser once connected — listing services, characteristics, and their values.
+Serve it with `mise run ble-debug` (`python3 -m http.server 8080`) since Web
+Bluetooth requires a secure context and won't run from `file://`.
+
+Once the firmware reaches the green-blink state, SentinelBox is visible to any
+phone or Chrome tab in range — the first step toward a phone-based configuration
+interface for the lock box.
+
 ## Mon 11 May 2026
 
 - got the stepper motor working

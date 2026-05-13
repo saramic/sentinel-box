@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SentinelBox BLE Debugger</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: monospace; background: #0d1117; color: #e6edf3; padding: 16px; }
+  h1 { color: #58a6ff; margin-bottom: 4px; font-size: 1.2em; }
+  .subtitle { color: #8b949e; font-size: 0.85em; margin-bottom: 16px; }
+
+  .warning { background: #2d1f00; border: 1px solid #f0883e; border-radius: 6px;
+             padding: 10px 14px; margin-bottom: 16px; color: #f0883e; font-size: 0.85em; }
+
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .panel { background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+           padding: 12px; flex: 1; min-width: 280px; }
+  .panel h2 { color: #8b949e; font-size: 0.8em; text-transform: uppercase;
+              letter-spacing: 0.1em; margin-bottom: 10px; }
+
+  button { background: #238636; color: #fff; border: none; border-radius: 6px;
+           padding: 7px 14px; cursor: pointer; font-family: monospace;
+           font-size: 0.9em; margin-right: 6px; margin-bottom: 6px; }
+  button:hover { background: #2ea043; }
+  button:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+  button.danger { background: #b62324; }
+  button.danger:hover { background: #d1242f; }
+  button.secondary { background: #21262d; border: 1px solid #30363d; }
+  button.secondary:hover { background: #30363d; }
+
+  #status { display: inline-block; padding: 3px 8px; border-radius: 12px;
+            font-size: 0.8em; margin-left: 8px; vertical-align: middle; }
+  .status-idle    { background: #21262d; color: #8b949e; }
+  .status-scanning { background: #1f2d3d; color: #58a6ff; }
+  .status-connected { background: #1a2d1a; color: #3fb950; }
+  .status-error   { background: #2d1a1a; color: #f85149; }
+
+  .device { border: 1px solid #30363d; border-radius: 6px; padding: 10px 12px;
+            margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s; }
+  .device:hover { border-color: #58a6ff; }
+  .device.sentinel { border-color: #3fb950; background: #1a2d1a; }
+  .device.connected { border-color: #58a6ff; background: #1a2338; }
+  .device-name { font-weight: bold; font-size: 0.95em; }
+  .device-name.unknown { color: #8b949e; font-style: italic; }
+  .device-id   { color: #8b949e; font-size: 0.75em; margin-top: 2px; }
+  .device-badge { font-size: 0.7em; padding: 1px 6px; border-radius: 10px;
+                  margin-left: 6px; vertical-align: middle; }
+  .badge-sentinel { background: #1a4d1a; color: #3fb950; border: 1px solid #3fb950; }
+  .badge-connected { background: #1a2d4d; color: #58a6ff; border: 1px solid #58a6ff; }
+
+  .service { margin: 6px 0; }
+  .service-uuid { color: #f0883e; font-size: 0.82em; }
+  .char { margin: 4px 0 4px 16px; font-size: 0.82em; }
+  .char-uuid { color: #79c0ff; }
+  .char-props { color: #8b949e; margin-left: 6px; font-size: 0.8em; }
+  .char-value { color: #3fb950; margin-left: 6px; word-break: break-all; }
+  .char-actions { margin-left: 16px; margin-top: 3px; }
+  .char-actions button { padding: 2px 8px; font-size: 0.78em; margin: 2px; }
+  .notify-badge { background: #1f2d3d; color: #58a6ff; font-size: 0.75em;
+                  padding: 1px 5px; border-radius: 8px; margin-left: 4px; }
+
+  #log { height: 260px; overflow-y: auto; font-size: 0.78em; line-height: 1.6; }
+  .log-info  { color: #e6edf3; }
+  .log-ok    { color: #3fb950; }
+  .log-warn  { color: #f0883e; }
+  .log-error { color: #f85149; }
+  .log-tx    { color: #79c0ff; }
+  .log-rx    { color: #d2a8ff; }
+  .log-time  { color: #484f58; margin-right: 6px; }
+
+  #nobt { text-align: center; padding: 32px; color: #f85149; }
+
+  input[type=text] { background: #0d1117; border: 1px solid #30363d; color: #e6edf3;
+                     border-radius: 4px; padding: 4px 8px; font-family: monospace;
+                     font-size: 0.82em; width: 180px; margin-right: 4px; }
+</style>
+</head>
+<body>
+
+<h1>SentinelBox BLE Debugger
+  <span id="status" class="status-idle">idle</span>
+</h1>
+<p class="subtitle">Web Bluetooth debug tool — scan, connect, browse GATT services</p>
+
+<div class="warning" id="ctx-warning" style="display:none">
+  ⚠ Web Bluetooth requires a <strong>secure context</strong>.
+  Open this file via <code>http://localhost:8080</code> (not <code>file://</code>).<br>
+  Run: <code>cd experiments/in_bluetooth &amp;&amp; python3 -m http.server 8080</code>
+  then open <a href="http://localhost:8080/ble_debug.html" style="color:#58a6ff">http://localhost:8080/ble_debug.html</a>
+</div>
+
+<div id="nobt" style="display:none">
+  Web Bluetooth not available.<br>
+  Use Chrome or Edge on desktop, or enable
+  <code>chrome://flags/#enable-experimental-web-platform-features</code>
+</div>
+
+<div id="main">
+  <div style="margin-bottom:12px">
+    <button id="btnScan">🔍 Scan for BLE devices</button>
+    <button id="btnDisconnect" class="danger" style="display:none">Disconnect</button>
+    <button id="btnClearLog" class="secondary">Clear log</button>
+  </div>
+
+  <div class="row">
+    <div class="panel" style="max-width:340px">
+      <h2>Devices</h2>
+      <div id="deviceList"><p style="color:#484f58;font-size:0.85em">No devices yet — click Scan</p></div>
+    </div>
+
+    <div class="panel" style="flex:2">
+      <h2>GATT Services</h2>
+      <div id="gattTree"><p style="color:#484f58;font-size:0.85em">Connect to a device to browse services</p></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:12px">
+    <h2>Log</h2>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script>
+const SENTINEL_NAME = 'SentinelBox';
+let gattServer = null;
+let connectedDevice = null;
+const knownDevices = new Map();
+
+// ── Logging ────────────────────────────────────────────────────────────────
+const logEl = document.getElementById('log');
+function log(msg, cls = 'log-info') {
+  const t = new Date().toISOString().substr(11, 12);
+  logEl.insertAdjacentHTML('beforeend',
+    `<div class="${cls}"><span class="log-time">${t}</span>${msg}</div>`);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function setStatus(text, cls) {
+  const s = document.getElementById('status');
+  s.textContent = text;
+  s.className = cls;
+}
+
+// ── BT availability check ──────────────────────────────────────────────────
+(async () => {
+  if (!window.isSecureContext) {
+    document.getElementById('ctx-warning').style.display = 'block';
+    return;
+  }
+  if (!navigator.bluetooth) {
+    document.getElementById('nobt').style.display = 'block';
+    document.getElementById('main').style.display = 'none';
+    return;
+  }
+  const avail = await navigator.bluetooth.getAvailability();
+  if (!avail) {
+    log('Bluetooth adapter not found or disabled', 'log-error');
+  } else {
+    log('Bluetooth available ✓', 'log-ok');
+  }
+})();
+
+// ── Scan ──────────────────────────────────────────────────────────────────
+document.getElementById('btnScan').addEventListener('click', async () => {
+  log('Opening BLE device picker…', 'log-info');
+  setStatus('scanning…', 'status-scanning');
+  try {
+    const device = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: [
+        'generic_access', 'generic_attribute',
+        // add your custom service UUIDs here as you develop them
+      ]
+    });
+    log(`Selected: "${device.name || '(unnamed)'}" — ${device.id}`,
+        device.name === SENTINEL_NAME ? 'log-ok' : 'log-info');
+    showDevice(device);
+    setStatus('device selected', 'status-idle');
+  } catch(e) {
+    if (e.name !== 'NotFoundError') log(`Scan error: ${e.message}`, 'log-error');
+    else log('Scan cancelled', 'log-warn');
+    setStatus('idle', 'status-idle');
+  }
+});
+
+// ── Device card ───────────────────────────────────────────────────────────
+function showDevice(device) {
+  knownDevices.set(device.id, device);
+
+  const isSentinel = device.name === SENTINEL_NAME;
+  const existing = document.getElementById('dev-' + device.id);
+  if (existing) existing.remove();
+
+  const card = document.createElement('div');
+  card.className = 'device' + (isSentinel ? ' sentinel' : '');
+  card.id = 'dev-' + device.id;
+  card.innerHTML = `
+    <div class="device-name ${device.name ? '' : 'unknown'}">
+      ${device.name || '(no name)'}
+      ${isSentinel ? '<span class="device-badge badge-sentinel">SentinelBox ✓</span>' : ''}
+    </div>
+    <div class="device-id">${device.id}</div>
+    <div style="margin-top:6px">
+      <button onclick="connectDevice('${device.id}')">Connect GATT</button>
+    </div>`;
+
+  const list = document.getElementById('deviceList');
+  const placeholder = list.querySelector('p');
+  if (placeholder) placeholder.remove();
+  if (isSentinel) list.prepend(card);
+  else list.appendChild(card);
+
+  device.addEventListener('gattserverdisconnected', () => {
+    log(`Disconnected from ${device.name || device.id}`, 'log-warn');
+    card.classList.remove('connected');
+    document.getElementById('gattTree').innerHTML =
+      '<p style="color:#484f58;font-size:0.85em">Disconnected</p>';
+    document.getElementById('btnDisconnect').style.display = 'none';
+    setStatus('idle', 'status-idle');
+    gattServer = null;
+    connectedDevice = null;
+  });
+}
+
+// ── Connect + GATT browse ─────────────────────────────────────────────────
+window.connectDevice = async (id) => {
+  const device = knownDevices.get(id);
+  if (!device) return;
+
+  if (connectedDevice) {
+    connectedDevice.gatt.disconnect();
+  }
+
+  log(`Connecting to ${device.name || device.id}…`, 'log-info');
+  setStatus('connecting…', 'status-scanning');
+  try {
+    gattServer = await device.gatt.connect();
+    connectedDevice = device;
+    log(`Connected ✓`, 'log-ok');
+    setStatus('connected', 'status-connected');
+    document.getElementById('btnDisconnect').style.display = 'inline-block';
+    document.getElementById('dev-' + id).classList.add('connected');
+    await browseGatt(gattServer);
+  } catch(e) {
+    log(`Connect failed: ${e.message}`, 'log-error');
+    setStatus('error', 'status-error');
+  }
+};
+
+async function browseGatt(server) {
+  const tree = document.getElementById('gattTree');
+  tree.innerHTML = '<p style="color:#8b949e;font-size:0.85em">Reading services…</p>';
+  log('Reading primary services…', 'log-info');
+
+  let services;
+  try {
+    services = await server.getPrimaryServices();
+  } catch(e) {
+    tree.innerHTML = `<p style="color:#f85149">Failed to get services: ${e.message}</p>`;
+    log(`getPrimaryServices error: ${e.message}`, 'log-error');
+    return;
+  }
+
+  log(`Found ${services.length} service(s)`, 'log-ok');
+  tree.innerHTML = '';
+
+  for (const svc of services) {
+    const svcEl = document.createElement('div');
+    svcEl.className = 'service';
+    svcEl.innerHTML = `<div class="service-uuid">▸ ${svc.uuid}</div>`;
+    tree.appendChild(svcEl);
+
+    let chars;
+    try { chars = await svc.getCharacteristics(); }
+    catch(e) { log(`getCharacteristics(${svc.uuid}): ${e.message}`, 'log-warn'); continue; }
+
+    for (const c of chars) {
+      const props = Object.keys(c.properties).filter(p => c.properties[p]).join(' ');
+      log(`  char ${c.uuid}  [${props}]`, 'log-info');
+
+      const charEl = document.createElement('div');
+      charEl.className = 'char';
+      charEl.id = 'char-' + c.uuid;
+      charEl.innerHTML = `
+        <span class="char-uuid">${c.uuid}</span>
+        <span class="char-props">[${props}]</span>
+        <span class="char-value" id="val-${c.uuid}"></span>`;
+
+      const actions = document.createElement('div');
+      actions.className = 'char-actions';
+
+      if (c.properties.read) {
+        const btn = document.createElement('button');
+        btn.className = 'secondary';
+        btn.textContent = 'Read';
+        btn.onclick = () => readChar(c);
+        actions.appendChild(btn);
+      }
+      if (c.properties.write || c.properties.writeWithoutResponse) {
+        const inp = document.createElement('input');
+        inp.type = 'text'; inp.placeholder = 'hex bytes e.g. 01 02 03';
+        inp.id = 'write-' + c.uuid;
+        const btn = document.createElement('button');
+        btn.textContent = 'Write';
+        btn.onclick = () => writeChar(c, inp.value);
+        actions.appendChild(inp);
+        actions.appendChild(btn);
+      }
+      if (c.properties.notify || c.properties.indicate) {
+        const btn = document.createElement('button');
+        btn.className = 'secondary';
+        btn.textContent = 'Subscribe';
+        btn.id = 'sub-' + c.uuid;
+        btn.onclick = () => subscribeChar(c, btn);
+        actions.appendChild(btn);
+      }
+      charEl.appendChild(actions);
+      svcEl.appendChild(charEl);
+    }
+  }
+}
+
+// ── GATT operations ────────────────────────────────────────────────────────
+async function readChar(c) {
+  try {
+    const val = await c.readValue();
+    const hex = [...new Uint8Array(val.buffer)].map(b => b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
+    const text = new TextDecoder().decode(val).replace(/[^\x20-\x7E]/g, '.');
+    const display = `${hex}  "${text}"`;
+    document.getElementById('val-' + c.uuid).textContent = display;
+    log(`Read ${c.uuid}: ${display}`, 'log-rx');
+  } catch(e) { log(`Read failed: ${e.message}`, 'log-error'); }
+}
+
+async function writeChar(c, hexStr) {
+  try {
+    const bytes = hexStr.trim().split(/\s+/).map(h => parseInt(h, 16)).filter(n => !isNaN(n));
+    const data = new Uint8Array(bytes);
+    if (c.properties.write) await c.writeValue(data);
+    else await c.writeValueWithoutResponse(data);
+    log(`Write ${c.uuid}: ${hexStr}`, 'log-tx');
+  } catch(e) { log(`Write failed: ${e.message}`, 'log-error'); }
+}
+
+async function subscribeChar(c, btn) {
+  try {
+    await c.startNotifications();
+    btn.textContent = 'Subscribed';
+    btn.disabled = true;
+    const badge = document.createElement('span');
+    badge.className = 'notify-badge';
+    badge.id = 'notif-' + c.uuid;
+    badge.textContent = '●';
+    document.getElementById('char-' + c.uuid).querySelector('.char-uuid').after(badge);
+    c.addEventListener('characteristicvaluechanged', e => {
+      const hex = [...new Uint8Array(e.target.value.buffer)]
+        .map(b => b.toString(16).padStart(2,'0').toUpperCase()).join(' ');
+      document.getElementById('val-' + c.uuid).textContent = hex;
+      log(`Notify ${c.uuid}: ${hex}`, 'log-rx');
+    });
+    log(`Subscribed to ${c.uuid}`, 'log-ok');
+  } catch(e) { log(`Subscribe failed: ${e.message}`, 'log-error'); }
+}
+
+// ── Disconnect ─────────────────────────────────────────────────────────────
+document.getElementById('btnDisconnect').addEventListener('click', () => {
+  if (connectedDevice) connectedDevice.gatt.disconnect();
+});
+
+document.getElementById('btnClearLog').addEventListener('click', () => {
+  document.getElementById('log').innerHTML = '';
+});
+</script>
+</body>
+</html>

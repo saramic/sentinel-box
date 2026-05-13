@@ -320,6 +320,54 @@ run = """
         -c 'program build/in_uart_comms_lpsdk.elf verify reset exit'
 """
 
+#
+# Experiments in bluetooth - LPSDK 🅲
+#
+[tasks."cbu:in_bluetooth_LPSDK"]
+description = "clean-build-upload bluetooth LPSDK"
+run = """
+  mise run clean:in_bluetooth_LPSDK
+  mise run build:in_bluetooth_LPSDK
+  mise run upload:in_bluetooth_LPSDK
+"""
+
+[tasks."serial"]
+# quit screen with CTRL-A K
+description = "open serial monitor for UART1 debug output (115200 baud)"
+run = """
+  PORT=$(ls /dev/tty.usbmodem* 2>/dev/null | head -1)
+  if [ -z "$PORT" ]; then echo "No usbmodem port found"; exit 1; fi
+  echo "Opening $PORT at 115200"
+  screen "$PORT" 115200
+"""
+
+[tasks."ble-debug"]
+description = "serve BLE debug page at http://localhost:8080/ble_debug.html"
+dir = "experiments/in_bluetooth"
+run = "python3 -m http.server 8080"
+
+[tasks."clean:in_bluetooth_LPSDK"]
+description = "clean bluetooth LPSDK"
+dir = "experiments/in_bluetooth"
+run = "make clean"
+
+[tasks."build:in_bluetooth_LPSDK"]
+description = "build bluetooth LPSDK firmware"
+dir = "experiments/in_bluetooth"
+run = "make"
+
+[tasks."upload:in_bluetooth_LPSDK"]
+description = "upload bluetooth LPSDK firmware"
+dir = "experiments/in_bluetooth"
+run = """
+    openocd \
+        -s /usr/local/share/openocd/scripts \
+        -f interface/cmsis-dap.cfg \
+        -f target/max3263x.cfg \
+        -c 'reset_config srst_only' \
+        -c 'program build/in_bluetooth_lpsdk.elf verify reset exit'
+"""
+
 [tools]
 ruby = "3.2.2"
 python = "3.11"

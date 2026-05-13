@@ -1,3 +1,8 @@
 .pio
 **/build
 **/target
+
+# TI CC256XB Bluetooth service pack — proprietary firmware, TI TSPA licence.
+# Download from https://www.ti.com/tool/CC256XB-BT-SP
+reference/CC256XB_BT_SP/
+reference/cc256xb_bt_sp_v1.8.zip
