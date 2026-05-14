@@ -368,6 +368,44 @@ run = """
         -c 'program build/in_bluetooth_lpsdk.elf verify reset exit'
 """
 
+#
+# Experiments in BTstack BLE GATT server - LPSDK 🅲 + BTstack
+#
+[tasks."cbu:in_btstack_LPSDK"]
+description = "clean-build-upload btstack LPSDK"
+run = """
+  mise run clean:in_btstack_LPSDK
+  mise run build:in_btstack_LPSDK
+  mise run upload:in_btstack_LPSDK
+"""
+
+[tasks."clean:in_btstack_LPSDK"]
+description = "clean btstack LPSDK"
+dir = "experiments/in_btstack"
+run = "make clean"
+
+[tasks."build:in_btstack_LPSDK"]
+description = "build btstack LPSDK firmware"
+dir = "experiments/in_btstack"
+run = "make"
+
+[tasks."upload:in_btstack_LPSDK"]
+description = "upload btstack LPSDK firmware"
+dir = "experiments/in_btstack"
+run = """
+    openocd \
+        -s /usr/local/share/openocd/scripts \
+        -f interface/cmsis-dap.cfg \
+        -f target/max3263x.cfg \
+        -c 'reset_config srst_only' \
+        -c 'program build/in_btstack_lpsdk.elf verify reset exit'
+"""
+
+[tasks."ble-debug:in_btstack"]
+description = "serve BTstack BLE debug page at http://localhost:8080/ble_debug.html"
+dir = "experiments/in_btstack"
+run = "python3 -m http.server 8080"
+
 [tools]
 ruby = "3.2.2"
 python = "3.11"

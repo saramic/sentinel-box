@@ -11,14 +11,14 @@
 - [ ] https://forum.arduino.cc/t/using-arduino-to-generate-quadrature-signals-for-sdr/212059/5
 - [ ] https://hackaday.com/2023/01/13/arduino-library-brings-rtl_433-to-the-esp32/#:~:text=If%20you%20have%20an%20RTL,as%20much%20of%20a%20surprise.
 - [ ] The new Elektor SDR Shield for Arduino – Travelling the waves Elektor TV
-    - https://www.youtube.com/watch?v=KHdqskbfFhA&t=14s
+  - https://www.youtube.com/watch?v=KHdqskbfFhA&t=14s
 - [ ] New LoRa 32 V4 ESP32 SX1262 Low Power Dev-Board 0.96inch
-  OLED Supports Wi-Fi BLE LoRa communication Compatible Meshtastic
-    - https://www.aliexpress.com/item/1005010203038481.html
+      OLED Supports Wi-Fi BLE LoRa communication Compatible Meshtastic
+  - https://www.aliexpress.com/item/1005010203038481.html
 - [ ] Scanning ESP32 Radar Tracks Multiple Targets in Real Time! - Circuit Helper
-    - https://www.youtube.com/watch?v=ZnkWKowQYXg
+  - https://www.youtube.com/watch?v=ZnkWKowQYXg
 - [ ] I made Esp32 based Radar : It has a Built-In Display - Dsn Industries
-    - https://www.youtube.com/watch?v=t4QVxeeEtEQ
+  - https://www.youtube.com/watch?v=t4QVxeeEtEQ
 
 - [ ] official docs
   - https://www.analog.com/en/products/max32630.html#documentation
@@ -32,22 +32,118 @@
 
 - another competition from 2017
 - [ ] https://www.allaboutcircuits.com/giveaways/get-creative-makewithmaxim-design-contest/
-     - https://forum.allaboutcircuits.com/ubs/makewithmaxim-vr-glove.970/
-     - https://forum.allaboutcircuits.com/ubs/pelvic-sensor.968/
-     - https://forum.allaboutcircuits.com/ubs/makewithmaxim-maxbot-a-low-cost-robotic-kit.975/
-     - https://forum.allaboutcircuits.com/ubs/max32630fthr-as-a-vr-controller-makewithmaxim.966/
-     - https://forum.allaboutcircuits.com/ubs/fitness-wearable.980/
-     - https://forum.allaboutcircuits.com/ubs/hygromax-630-made-with-maxim-final-submission.989/
-     - https://forum.allaboutcircuits.com/ubs/impact-sensor.979/
-     - https://forum.allaboutcircuits.com/ubs/autonomous-quadcopter.987/
-     - https://forum.allaboutcircuits.com/ubs/makewithmaxim-sciencesensorhub.988/
-     - https://forum.allaboutcircuits.com/ubs/max32630fthr-wearable-ekg.990/
-     - https://forum.allaboutcircuits.com/ubs/makewithmaxim-model-rocket-data-acquisition-and-telemetry.976/
+  - https://forum.allaboutcircuits.com/ubs/makewithmaxim-vr-glove.970/
+  - https://forum.allaboutcircuits.com/ubs/pelvic-sensor.968/
+  - https://forum.allaboutcircuits.com/ubs/makewithmaxim-maxbot-a-low-cost-robotic-kit.975/
+  - https://forum.allaboutcircuits.com/ubs/max32630fthr-as-a-vr-controller-makewithmaxim.966/
+  - https://forum.allaboutcircuits.com/ubs/fitness-wearable.980/
+  - https://forum.allaboutcircuits.com/ubs/hygromax-630-made-with-maxim-final-submission.989/
+  - https://forum.allaboutcircuits.com/ubs/impact-sensor.979/
+  - https://forum.allaboutcircuits.com/ubs/autonomous-quadcopter.987/
+  - https://forum.allaboutcircuits.com/ubs/makewithmaxim-sciencesensorhub.988/
+  - https://forum.allaboutcircuits.com/ubs/max32630fthr-wearable-ekg.990/
+  - https://forum.allaboutcircuits.com/ubs/makewithmaxim-model-rocket-data-acquisition-and-telemetry.976/
 
 - [ ] Digikey schematics
   - https://www.digikey.com/en/schemeit/project/max32630fthr-pegasus-board-TS7G7N03027G
 
 ---
+
+## Thu 14 May 2026
+
+### From Raw HCI to BTstack — a Proper BLE Stack
+
+Yesterday's `experiments/in_bluetooth` got advertising working by hand-rolling
+every HCI command — manually uploading the CC256XB service pack, constructing
+advertising payloads byte-by-byte, and polling the UART for event responses.
+That's fine for "does it transmit?", but it can't do anything useful: no GATT
+server, no connection handling, no ATT database. A phone can see "SentinelBox"
+in its scan list but can never read or write a characteristic.
+
+Today's `experiments/in_btstack` replaces all of that with
+[BTstack](https://github.com/bluekitchen/btstack) — a lightweight, portable
+Bluetooth stack that handles HCI, L2CAP, ATT, SM and GATT properly.
+
+#### Third-party library: BTstack as a git submodule
+
+```sh
+git submodule add https://github.com/bluekitchen/btstack.git third_party/btstack
+```
+
+BTstack is ~300 source files but only ~20 are needed for a BLE-only GATT
+server. The Makefile lists each one explicitly — no wildcard magic:
+
+```makefile
+BTSTACK_SRCS := \
+    btstack_memory.c btstack_linked_list.c \
+    hci.c hci_cmd.c hci_transport_h4.c \
+    l2cap.c l2cap_signaling.c \
+    att_db.c att_dispatch.c att_server.c \
+    sm.c le_device_db_memory.c \
+    btstack_chipset_cc256x.c \
+    btstack_uart_block_embedded.c
+```
+
+#### Differences from @arvindsa's approach
+
+Fellow challenger @arvindsa documented their BTstack bring-up in [Identity
+Protocol - Part 4 - BLE using PAN1326B and BTstack](https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56853/identity-protocol---part-4---ble-using-pan1326b-and-btstack).
+Key differences in my implementation:
+
+| Their approach                                                 | Mine  |
+|----------------------------------------------------------------|---------------------------------------------------------------|
+| Used BTstack's bundled LPSDK copy in `port/max32630-fthr/maxim/` | Use system LPSDK at `~/Maxim/Firmware` — smaller checkout     |
+| Used BTstack's own `main.c` + `btstack_port.c` from the port directory | Wrote a custom `port/btstack_port.c` with a polling HAL — no interrupts, explicit `drain_tx`/`drain_rx` in the main loop |
+| Needed `-DENABLE_HCI_INIT` flag (unclear why)                  | Not needed — `bluetooth_main()` calls `hci_init()` directly   |
+| Needed a `btstack_link_key_db_stub.c` linker shim              | Not needed — only BLE sources compiled, no classic references |
+| Beacon-only (advertising, no GATT)                             | Full GATT server with LED control characteristic              |
+
+#### The GATT database — `.gatt` → `.h`
+
+BTstack has a Python tool that compiles a human-readable `.gatt` file into a C
+byte array. The service definition is trivial:
+
+```
+PRIMARY_SERVICE, 0000F001-0000-1000-8000-00805F9B34FB
+    CHARACTERISTIC, 0000F002-..., DYNAMIC | WRITE | WRITE_WITHOUT_RESPONSE,
+```
+
+Compiled with:
+
+```sh
+python3 third_party/btstack/tool/compile_gatt.py \
+    led_service.gatt led_service.h
+```
+
+#### The `l2cap_init()` bug
+
+Connection worked (LED turned blue) but Chrome's Web Bluetooth page hung at
+"Reading services…" — no GATT responses ever came back. The issue:
+`l2cap_init()` was missing from `btstack_main()`. L2CAP is the multiplexing
+layer between HCI and ATT. Without it, incoming ATT requests on CID 0x0004 are
+Every BTstack example calls it before `sm_init()`:
+
+```c
+l2cap_init();
+sm_init();
+att_server_init(profile_data, NULL, att_write_handler);
+```
+
+#### Custom polling HAL
+
+Unlike the official BTstack port which uses interrupts and DMA, this
+implementation polls UART0 directly in the main loop. The key insight was
+needing a **second TX drain** after `btstack_run_loop_embedded_execute_once()`
+— without it, ATT responses queued during packet processing wait an entire
+extra loop iteration, breaking Web Bluetooth's tight timing expectations.
+
+#### Web Bluetooth debugger
+
+A `ble_debug.html` page served from localhost uses the Web Bluetooth API to
+scan, connect, browse services, read/write characteristics, and subscribe to
+notifications — all from Chrome with zero native code. After the `l2cap_init()`
+fix, it successfully discovers the LED service and writes `01`/`02`/`03` to
+toggle the RGB LED remotely.
 
 ## Wed 13 May 2026
 
@@ -61,7 +157,7 @@ respond involved several non-obvious steps.
 #### Mapping B — the crossover surprise
 
 UART0 on the MAX32630 has two pin mappings. On the FTHR board, the PAN1326B is
-wired so that P0.0 is the MCU's *receive* pin and P0.1 is *transmit* — the
+wired so that P0.0 is the MCU's _receive_ pin and P0.1 is _transmit_ — the
 opposite of the UART0 default (Mapping A). Selecting **Mapping B** in the IOMAN
 configuration crossovers them automatically. Nothing in the Arduino world would
 surface this because `Serial0.begin()` just works — in bare-metal LPSDK you have
@@ -190,8 +286,8 @@ native app. The device picker shows all advertising BLE devices:
 
 ```js
 const device = await navigator.bluetooth.requestDevice({
-    acceptAllDevices: true,
-    optionalServices: ['generic_access']
+  acceptAllDevices: true,
+  optionalServices: ["generic_access"],
 });
 const server = await device.gatt.connect();
 const services = await server.getPrimaryServices();
@@ -219,25 +315,23 @@ interface for the lock box.
 
 ### Uart comms
 
-A comment came up on my last post about UART comms. [Sentinel Box - Part II - back to C](
-  https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56894/sentinel-box---part-ii---back-to-c
-)
+A comment came up on my last post about UART comms. [Sentinel Box - Part II - back to C](https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56894/sentinel-box---part-ii---back-to-c)
 
 presumably in regards to @skruglewicz design
 
-[Forum #5: Proposed Design — Adaptive Sentinel: Security & Environmental Intelligence Hub](
-  https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56892/forum-5-proposed-design-adaptive-sentinel-security-environmental-intelligence-hub
-)
+[Forum #5: Proposed Design — Adaptive Sentinel: Security & Environmental Intelligence Hub](https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56892/forum-5-proposed-design-adaptive-sentinel-security-environmental-intelligence-hub)
 
 having a MAX32630FTHR talk UART to a UNO Q
 and another MAX32630FTHR talk UART to the same UNO Q
 
 UART should work:
+
 - with same voltage either 3V3 or 5V otherwise you will need a lievel shifter
 - RX on one board has to go across to TX on the other board
 - they need a shared GND
 
 Baud rates
+
 - < 1m 115200+ should be ok
 - ~3m 115200 is the limit
 - ~10m 9600-57600 would start seeing errors
@@ -246,6 +340,7 @@ Baud rates
 UART is fine for 2 boards on a desk
 
 Other alternatives are
+
 - CAN bus
   - 128 (CAN) nodes or unlimited with CAN FD
   - 500m @125kbps or 40m @1Mbps
@@ -269,6 +364,7 @@ Other alternatives are
 there is also: LIN Bus, Modbus, EtherCAT, 1-Wire, SPI
 
 TO acutally get UART working you have 3 approaches:
+
 1. Request/Response - one device is mater and sends requests and then listens - simple and predictable
 2. Turn-taking with a token/flag byte
 3. Asychronous/event-driven - dependent on UART being full-duplex - but you need start/end framing markers and buffering so you can assemble complete messages from the stream
@@ -370,8 +466,7 @@ Made a reasonable LED matrix "artificial horizon" with scrolling velocity
 feedback using the onboard `BMI160` intertial measurement unit and an external
 LED matrix display powered by a MAX7219 serial display driver.
 
-The core logic is in the [./experiments/in_attitude_meter/src/main.rs](
-./experiments/in_attitude_meter/src/main.rs) file.
+The core logic is in the [./experiments/in_attitude_meter/src/main.rs](./experiments/in_attitude_meter/src/main.rs) file.
 
 ```rust
     loop {
@@ -413,25 +508,25 @@ The core logic is in the [./experiments/in_attitude_meter/src/main.rs](
 ```
 
 based on the BMI160 data sheet
-- [https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmi160-ds000.pdf](
-  https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmi160-ds000.pdf)
+
+- [https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmi160-ds000.pdf](https://www.bosch-sensortec.com/media/boschsensortec/downloads/datasheets/bst-bmi160-ds000.pdf)
 
 1. Two I2C transactions per frame (easy fix)
-read_accel_x() does a 2-byte read, read_accel_y() does a separate 6-byte read —
-two transactions. read_accel_y() already reads all 6 bytes and discards X and
-Z. One function reading all 6 at once and returning a struct would halve your
-I2C traffic.
+   read_accel_x() does a 2-byte read, read_accel_y() does a separate 6-byte read —
+   two transactions. read_accel_y() already reads all 6 bytes and discards X and
+   Z. One function reading all 6 at once and returning a struct would halve your
+   I2C traffic.
 
 2. Z axis — already in your buffer, thrown away
-The 6 bytes at REG_ACC_X_LSB give X, Y, Z in order. buf[4..5] = Z (vertical
-when flat). Z lets you detect if the board is nearly flat vs steeply tilted,
-and x²+y²+z² ≈ 16384² is a vibration/free-fall check.
+   The 6 bytes at REG_ACC_X_LSB give X, Y, Z in order. buf[4..5] = Z (vertical
+   when flat). Z lets you detect if the board is nearly flat vs steeply tilted,
+   and x²+y²+z² ≈ 16384² is a vibration/free-fall check.
 
 3. Gyroscope — completely unused
-The chip has a full 3-axis gyroscope — currently in suspend. Wake it with
-CMD_GYR_NORMAL = 0x15 (startup takes 55 ms). Gyro data is at registers
-0x0C–0x11 (same 6-byte pattern as accel). At default ±2000°/s range,
-sensitivity = 16.4 LSB/°/s.
+   The chip has a full 3-axis gyroscope — currently in suspend. Wake it with
+   CMD_GYR_NORMAL = 0x15 (startup takes 55 ms). Gyro data is at registers
+   0x0C–0x11 (same 6-byte pattern as accel). At default ±2000°/s range,
+   sensitivity = 16.4 LSB/°/s.
 
 For the attitude meter this is the biggest win: gyro gives angular rate
 (rotation speed in °/s), which doesn't noise-up with vibration. A simple
@@ -442,51 +537,48 @@ This gives stable, smooth tilt — gyro handles fast motion, accel corrects slow
 drift.
 
 4. ACC_CONF (0x40) — ODR not set explicitly
-Your loop runs at ~5 ms (200 Hz) but the default accelerometer ODR is 100 Hz
-(acc_odr=8). You're reading stale data half the time. Write 0x29 to ACC_CONF to
-set 200 Hz, or 0x2A for 400 Hz.
+   Your loop runs at ~5 ms (200 Hz) but the default accelerometer ODR is 100 Hz
+   (acc_odr=8). You're reading stale data half the time. Write 0x29 to ACC_CONF to
+   set 200 Hz, or 0x2A for 400 Hz.
 
 5. Fast Offset Compensation — one-shot hardware calibration
-From §2.9.1: a built-in calibration sequence removes mounting bias. With the
-board held flat, write FOC_CONF (0x69) then issue start_foc to the CMD register
-(0x7E). Takes ≤250 ms, then writes trim values into the OFFSET registers
-(0x71–0x77) automatically. The accuracy is 3.9 mg. Can be saved to NVM (≤14
-write cycles lifetime). This would zero out any bias so "level" truly reads
-ax=0, ay=0.
+   From §2.9.1: a built-in calibration sequence removes mounting bias. With the
+   board held flat, write FOC_CONF (0x69) then issue start_foc to the CMD register
+   (0x7E). Takes ≤250 ms, then writes trim values into the OFFSET registers
+   (0x71–0x77) automatically. The accuracy is 3.9 mg. Can be saved to NVM (≤14
+   write cycles lifetime). This would zero out any bias so "level" truly reads
+   ax=0, ay=0.
 
 6. Temperature sensor — free when gyro is active
-Registers 0x20–0x21, 16-bit, 0.002°C/LSB, centre at 23°C. No extra init. Useful
-for knowing if thermal drift is affecting readings.
+   Registers 0x20–0x21, 16-bit, 0.002°C/LSB, centre at 23°C. No extra init. Useful
+   for knowing if thermal drift is affecting readings.
 
-Priority    | Change                                    | Benefit
-------------|-------------------------------------------|----------------------
-1           | Single burst read for X+Y+Z               | Efficiency + Z axis
-2           | Set ACC_CONF ODR to 200 Hz                | No stale reads
-3           | Enable gyroscope + complementary filter   | Smooth stable attitude
-4           | FOC calibration at startup                | True zero at level
+| Priority | Change                                  | Benefit                |
+| -------- | --------------------------------------- | ---------------------- |
+| 1        | Single burst read for X+Y+Z             | Efficiency + Z axis    |
+| 2        | Set ACC_CONF ODR to 200 Hz              | No stale reads         |
+| 3        | Enable gyroscope + complementary filter | Smooth stable attitude |
+| 4        | FOC calibration at startup              | True zero at level     |
 
 ## Wed 23 Apr 2026
 
 ### 6 Axis acceleromenter and an attitude meter in Rust 🦀
 
 The 6 Axis acccelerometer inside the MAX32630FTHR can be used for a balance bot
+
 - https://www.hackster.io/justin-jordan/max32630fthr-balance-bot-621f0f
 
 - **MAX32630FTHR Balance Bot - Justin Jordan**
 
   [![
-    MAX32630FTHR Balance Bot - Justin Jordan
-  ](
-    http://img.youtube.com/vi/Uu7QbEvHTG8/0.jpg
-  )](https://youtu.be/Uu7QbEvHTG8)
+  MAX32630FTHR Balance Bot - Justin Jordan
+](http://img.youtube.com/vi/Uu7QbEvHTG8/0.jpg)](https://youtu.be/Uu7QbEvHTG8)
 
 - **MAX32630FTHR Balance Bot part 2 - Justin Jordan**
 
   [![
-    MAX32630FTHR Balance Bot part 2 - Justin Jordan
-  ](
-    http://img.youtube.com/vi/A3T340ZXMZY/0.jpg
-  )](https://youtu.be/A3T340ZXMZY)
+  MAX32630FTHR Balance Bot part 2 - Justin Jordan
+](http://img.youtube.com/vi/A3T340ZXMZY/0.jpg)](https://youtu.be/A3T340ZXMZY)
 
 most of the code has been downloaded into
 [./reference/MAX32630FTHR_balance_bot_code](reference/MAX32630FTHR_balance_bot_code)
@@ -613,7 +705,7 @@ the rescue, supposedly a previous vibe sesh had not changed the voltage on the
 // (mbed only writes LDO2; LDO3 omitted here to match the reference exactly.)
 ```
 
-Luckly the board was OK and after some more vibing I worked out that  to set
+Luckly the board was OK and after some more vibing I worked out that to set
 the voltage output (3.3V) for the MAX14690 PMIC's LDO (Low Dropout Regulator)
 you need to:
 
@@ -659,11 +751,10 @@ Here's what they mean in this context:
 
 Seems, the install didn't work correctly (I was using the newer MSDK without MAX32360 support). Following the steps again
 
-  - https://www.analog.com/en/products/max32630.html
-  - [Low Power ARM Micro SDK (Mac) 1.2.0](
-    https://www.analog.com/en/resources/evaluation-hardware-and-software/embedded-development-software/software-download.html?swpart=SFW0001660A)
-    - login
-    - **`ARMCortexToolhchain.dmg`**
+- https://www.analog.com/en/products/max32630.html
+- [Low Power ARM Micro SDK (Mac) 1.2.0](https://www.analog.com/en/resources/evaluation-hardware-and-software/embedded-development-software/software-download.html?swpart=SFW0001660A)
+  - login
+  - **`ARMCortexToolhchain.dmg`**
 
 ```sh
 # check the firmware is there
@@ -708,9 +799,9 @@ The reality is
 >
 > **The real issue is the chip, not the language.** The MAX32630 has:
 >
-> * mbed EOL in June
-> * No MSDK support
-> * No Rust HAL
+> - mbed EOL in June
+> - No MSDK support
+> - No Rust HAL
 >
 > If you switched to a chip with a Rust HAL you'd get the full ecosystem for
 > free. Best options:
@@ -731,14 +822,14 @@ Can I write the HAL myself? is it worth it?
 > Building a **HAL** on top means implementing embedded-hal traits for each
 > peripheral:
 >
-> Peripheral          | Effort                 | Notes
-> --------------------|------------------------|---------------------------------
-> GPIO (Input/Output) | Done — you just did it | ~50 lines
-> SPI                 | Medium — ~200 lines    | need clock config, modes
-> I2C                 | Hard — ~300 lines      | clock stretching, error handling
-> UART                | Medium                 | easier than I2C
-> Timers              | Medium                 | needed for real delays
-> ADC                 | Medium                 |
+> | Peripheral          | Effort                 | Notes                            |
+> | ------------------- | ---------------------- | -------------------------------- |
+> | GPIO (Input/Output) | Done — you just did it | ~50 lines                        |
+> | SPI                 | Medium — ~200 lines    | need clock config, modes         |
+> | I2C                 | Hard — ~300 lines      | clock stretching, error handling |
+> | UART                | Medium                 | easier than I2C                  |
+> | Timers              | Medium                 | needed for real delays           |
+> | ADC                 | Medium                 |
 >
 > Total realistic estimate: **2–4 weeks** of focused work to get `SPI` + `I2C` +
 > `GPIO` to a usable state — the minimum needed for your fingerprint/`NFC` use
@@ -767,15 +858,14 @@ it into `/usr/local/bin/MaximSDK`. Leaving it to download and install ...
 Seems that the MSDK I downloaded is for "newer" `MAX32690` or `MAX78000` - I
 need the older LPSDK (Low Power SDK) to get support for the legach `MAX32360`
 
-Back to Element14 community post by [@arvindsa identity protocol - part 3](
-https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56840/identity-protocol---part-3---unboxing-and-blinking-with-maxim-lpsdk)
+Back to Element14 community post by [@arvindsa identity protocol - part 3](https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56840/identity-protocol---part-3---unboxing-and-blinking-with-maxim-lpsdk)
 
 go to
-  - https://www.analog.com/en/products/max32630.html
-  - [Low Power ARM Micro SDK (Mac) 1.2.0](
-    https://www.analog.com/en/resources/evaluation-hardware-and-software/embedded-development-software/software-download.html?swpart=SFW0001660A)
-    - login
-    - **`ARMCortexToolhchain.dmg`**
+
+- https://www.analog.com/en/products/max32630.html
+- [Low Power ARM Micro SDK (Mac) 1.2.0](https://www.analog.com/en/resources/evaluation-hardware-and-software/embedded-development-software/software-download.html?swpart=SFW0001660A)
+  - login
+  - **`ARMCortexToolhchain.dmg`**
 
 running install mostly may have worked, got this error
 
@@ -832,13 +922,13 @@ from some internet searching
 >
 > The real options for MAX32630 seem to be:
 >
-> * mbed (works now, EOL June 2026)
-> * Rust (working today, as you just proved) - see above ^^
+> - mbed (works now, EOL June 2026)
+> - Rust (working today, as you just proved) - see above ^^
 >
 > Sources:
 >
-> * [analogdevicesinc GitHub - MAX32630 repos](https://github.com/analogdevicesinc?q=MAX32630)
-> * [MaximIntegratedTechSupport migration notice](https://github.com/MaximIntegratedTechSupport)
+> - [analogdevicesinc GitHub - MAX32630 repos](https://github.com/analogdevicesinc?q=MAX32630)
+> - [MaximIntegratedTechSupport migration notice](https://github.com/MaximIntegratedTechSupport)
 
 ## Sun 19 Apr 2026
 
@@ -866,8 +956,7 @@ platform = maxim32
 board = max32630fthr
 ```
 
-Following [Forum Thread 2 EchoGuard – MAX32630FTHR Setup & First Blink Program Upload - Nidhee](
-https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56852/forum-thread-2-echoguard-max32630fthr-setup-first-blink-program-upload)
+Following [Forum Thread 2 EchoGuard – MAX32630FTHR Setup & First Blink Program Upload - Nidhee](https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/f/forum/56852/forum-thread-2-echoguard-max32630fthr-setup-first-blink-program-upload)
 
 ```sh
 brew install open-ocd
@@ -921,18 +1010,17 @@ which openocd
 ```
 
 should probably follow the instructions on Analog Devices site
-- [https://analogdevicesinc.github.io/msdk//USERGUIDE/#completing-the-installation-on-macos](
-  https://analogdevicesinc.github.io/msdk//USERGUIDE/#completing-the-installation-on-macos)
+
+- [https://analogdevicesinc.github.io/msdk//USERGUIDE/#completing-the-installation-on-macos](https://analogdevicesinc.github.io/msdk//USERGUIDE/#completing-the-installation-on-macos)
 
 ```sh
 brew install libusb-compat libftdi hidapi libusb
 ```
 
 Download:
-- [https://analogdevicesinc.github.io/msdk//USERGUIDE/#download](
-  https://analogdevicesinc.github.io/msdk//USERGUIDE/#download)
-  - [https://www.analog.com/en/resources/evaluation-hardware-and-software/embedded-development-software/software-download.html?swpart=SFW0018610B](
-    https://www.analog.com/en/resources/evaluation-hardware-and-software/embedded-development-software/software-download.html?swpart=SFW0018610B)
+
+- [https://analogdevicesinc.github.io/msdk//USERGUIDE/#download](https://analogdevicesinc.github.io/msdk//USERGUIDE/#download)
+  - [https://www.analog.com/en/resources/evaluation-hardware-and-software/embedded-development-software/software-download.html?swpart=SFW0018610B](https://www.analog.com/en/resources/evaluation-hardware-and-software/embedded-development-software/software-download.html?swpart=SFW0018610B)
     - sign up for an account
 
 Back in just using the manually built and installed openocd
@@ -990,8 +1078,7 @@ mise install ruby 4.0.2
 mise use ruby@4.0.2
 ```
 
-install jekyll following [https://jekyllrb.com/docs/](
-https://jekyllrb.com/docs/)
+install jekyll following [https://jekyllrb.com/docs/](https://jekyllrb.com/docs/)
 
 ```sh
 gem install jekyll bundler
@@ -1005,8 +1092,7 @@ but will ruby 4 and jekyll 4.4 run on github pages? do I need the [github-pages
 GEM](https://github.com/github/pages-gem)?
 
 and configuring the `main` branch and `./docs` directory to be a **Pages** via
-[https://github.com/saramic/sentinel-box/settings/pages](
-https://github.com/saramic/sentinel-box/settings/pages)
+[https://github.com/saramic/sentinel-box/settings/pages](https://github.com/saramic/sentinel-box/settings/pages)
 
 **NO**
 
@@ -1067,12 +1153,12 @@ seems to build but still not showing a built page in GitHub pages
 
 Also in the GHActions build, I notised a **Warning** which may allow me to
 update the version of Jekyll
-* [https://jekyllrb.com/docs/continuous-integration/github-actions/](
-  https://jekyllrb.com/docs/continuous-integration/github-actions/)
+
+- [https://jekyllrb.com/docs/continuous-integration/github-actions/](https://jekyllrb.com/docs/continuous-integration/github-actions/)
 
 Finally to decide on a better theme:
-* [https://docs.github.com/en/pages/setting-up-a-github-pages-site-with-jekyll/adding-a-theme-to-your-github-pages-site-using-jekyll](
-  https://docs.github.com/en/pages/setting-up-a-github-pages-site-with-jekyll/adding-a-theme-to-your-github-pages-site-using-jekyll)
+
+- [https://docs.github.com/en/pages/setting-up-a-github-pages-site-with-jekyll/adding-a-theme-to-your-github-pages-site-using-jekyll](https://docs.github.com/en/pages/setting-up-a-github-pages-site-with-jekyll/adding-a-theme-to-your-github-pages-site-using-jekyll)
   - [Architect](https://pages-themes.github.io/architect/) probably a winner
     with a clear "blue print" style
   - [Caymen](https://pages-themes.github.io/cayman/) nice and clean and more
@@ -1120,12 +1206,10 @@ script with a command line build would be preferable. Some information here
 
 - **GitHub: analogdevicesinc/msdk** Software Development Kit for Analog
   Device's MAX-series microcontrollers
-  - [https://github.com/analogdevicesinc/msdk?tab=readme-ov-file](
-    https://github.com/analogdevicesinc/msdk?tab=readme-ov-file)
+  - [https://github.com/analogdevicesinc/msdk?tab=readme-ov-file](https://github.com/analogdevicesinc/msdk?tab=readme-ov-file)
 
 - how to setup MSDK for commandline
-  - [https://analogdevicesinc.github.io/msdk//USERGUIDE/#getting-started-with-command-line-development](
-    https://analogdevicesinc.github.io/msdk//USERGUIDE/#getting-started-with-command-line-development)
+  - [https://analogdevicesinc.github.io/msdk//USERGUIDE/#getting-started-with-command-line-development](https://analogdevicesinc.github.io/msdk//USERGUIDE/#getting-started-with-command-line-development)
 
 ## Mon 13 Apr 2026
 
@@ -1149,7 +1233,6 @@ with:
 - **MAX32630FTHR** — the most RAM (512 KB) and flash (2 MB) of the group,
   suited to medical and industrial use cases where you need headroom for larger
   models, but has weaker community support and costs more.
-
 
 ### The Sentinel Box — Unlock Mechanisms (Easiest → Most Absurd)
 
@@ -1269,23 +1352,23 @@ with:
 
 ### Core Hardware List
 
-Component                       | What & Why
---------------------------------|-----------
-MAX32630FTHR                    | The brain. Runs all local inference, drives the motor, orchestrates unlock logic
-Stepper motor + A4988/DRV8825   | driverDrives the vault mechanism. Stepper gives you precise rotational control for the locking bolt. Driver handles current the MAX32630 can't supply directly
-Perspex enclosure + servo-actuated latch    | A servo or small stepper turns a cam that physically moves a bolt. 3D print the bolt mechanism
-ICM-42688-P IMU breakout        | Gesture sequences, shake pattern unlock, tilt combination. I2C to the MAX32630
-Piezo vibration sensor          | Tap patterns, Morse code, rhythm detection. Analogue input, very cheap
-PDM MEMS microphone (ICS-43434 or SPH0641)  | Wake word, audio quiz capture, voice stress analysis. PDM interface to MAX32630
-Arducam Mini 2MP (OV2640, SPI)  | QR code reading, object recognition unlock, gesture via vision. SPI to MAX32630
-Optical fingerprint sensor (R307 or AS608)  | Parent fingerprint(s). UART interface, has its own onboard template matching
-PN532 NFC module                | Read/write NFC cards and phones. I2C or SPI to MAX32630. Handles TOTP card reading
-GPS module (u-blox NEO-6M or NEO-M8N)       | Geofence validation. UART to MAX32630. NEO-M8N is more accurate
-ESP32 or ESP8266 co-processor   | Wi-Fi bridge. MAX32630 has no Wi-Fi — this handles lambda calls, audio streaming, BLE beacon scanning. UART to MAX32630
-Small speaker + PAM8403 amp     | Plays audio quiz questions, fake unlock sounds, honeypot feedback
-WS2812B LED strip (small)       | Visual feedback on unlock state, honeypot animations, countdown timers
-LiPo battery + TP4056 charger   | Portable power so moving it doesn't mean it dies
-Tactile buttons (x3-4)          | Manual admin reset, pairing mode, honeypot button
+| Component                                  | What & Why                                                                                                                                                     |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MAX32630FTHR                               | The brain. Runs all local inference, drives the motor, orchestrates unlock logic                                                                               |
+| Stepper motor + A4988/DRV8825              | driverDrives the vault mechanism. Stepper gives you precise rotational control for the locking bolt. Driver handles current the MAX32630 can't supply directly |
+| Perspex enclosure + servo-actuated latch   | A servo or small stepper turns a cam that physically moves a bolt. 3D print the bolt mechanism                                                                 |
+| ICM-42688-P IMU breakout                   | Gesture sequences, shake pattern unlock, tilt combination. I2C to the MAX32630                                                                                 |
+| Piezo vibration sensor                     | Tap patterns, Morse code, rhythm detection. Analogue input, very cheap                                                                                         |
+| PDM MEMS microphone (ICS-43434 or SPH0641) | Wake word, audio quiz capture, voice stress analysis. PDM interface to MAX32630                                                                                |
+| Arducam Mini 2MP (OV2640, SPI)             | QR code reading, object recognition unlock, gesture via vision. SPI to MAX32630                                                                                |
+| Optical fingerprint sensor (R307 or AS608) | Parent fingerprint(s). UART interface, has its own onboard template matching                                                                                   |
+| PN532 NFC module                           | Read/write NFC cards and phones. I2C or SPI to MAX32630. Handles TOTP card reading                                                                             |
+| GPS module (u-blox NEO-6M or NEO-M8N)      | Geofence validation. UART to MAX32630. NEO-M8N is more accurate                                                                                                |
+| ESP32 or ESP8266 co-processor              | Wi-Fi bridge. MAX32630 has no Wi-Fi — this handles lambda calls, audio streaming, BLE beacon scanning. UART to MAX32630                                        |
+| Small speaker + PAM8403 amp                | Plays audio quiz questions, fake unlock sounds, honeypot feedback                                                                                              |
+| WS2812B LED strip (small)                  | Visual feedback on unlock state, honeypot animations, countdown timers                                                                                         |
+| LiPo battery + TP4056 charger              | Portable power so moving it doesn't mean it dies                                                                                                               |
+| Tactile buttons (x3-4)                     | Manual admin reset, pairing mode, honeypot button                                                                                                              |
 
 ### Purchase list
 
@@ -1312,17 +1395,14 @@ and related-ish
 ### On Box mechanisms
 
 - valut like mechanism
-  - [https://www.instructables.com/Simple-Vault-Mechanism/](
-    https://www.instructables.com/Simple-Vault-Mechanism/)
+  - [https://www.instructables.com/Simple-Vault-Mechanism/](https://www.instructables.com/Simple-Vault-Mechanism/)
   - using timber but simple mechanism of 1 spinning centre piece moving 4
     separate outer bars
 
 - 3D printed vault with gears
-  - [https://makerworld.com/en/models/988716-key-safe-vault-bank-money-bank-piggy-bank#profileId-963873](
-     https://makerworld.com/en/models/988716-key-safe-vault-bank-money-bank-piggy-bank#profileId-963873)
+  - [https://makerworld.com/en/models/988716-key-safe-vault-bank-money-bank-piggy-bank#profileId-963873](https://makerworld.com/en/models/988716-key-safe-vault-bank-money-bank-piggy-bank#profileId-963873)
 
-- [https://makezine.com/projects/keyless-lock-box/](
-  https://makezine.com/projects/keyless-lock-box/)
+- [https://makezine.com/projects/keyless-lock-box/](https://makezine.com/projects/keyless-lock-box/)
   - using a bolt on the end of a servo to hook around a metal bar
   - uses Arduino
   - and a Parallax OFN, optical finger navigation, sensor as a combination
