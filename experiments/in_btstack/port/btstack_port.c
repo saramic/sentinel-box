@@ -1,9 +1,13 @@
 /*
  * btstack_port.c — MAX32630FTHR platform bring-up for BTstack + CC2564B.
  *
+ * Based on the official BTstack port at third_party/btstack/port/max32630-fthr/.
  * Implements the hal_uart_dma interface consumed by btstack_uart_block_embedded.c,
- * plus hal_cpu and hal_time_ms, so this single file replaces the old
- * btstack_uart_block_max32630.c, hal_cpu.c and hal_time.c.
+ * plus hal_cpu and hal_time_ms.
+ *
+ * The UART HAL is polling-based (same as the official port): the main loop
+ * calls hal_btstack_run_loop_execute_once() which drains RX/TX FIFOs and
+ * then ticks the BTstack embedded run loop.
  */
 
 #include <string.h>
@@ -30,28 +34,39 @@
 
 int btstack_main(int argc, const char *argv[]);
 
-#define BLE_UART_ID  0
+#define BLE_UART_ID         0
+#define UART_RXFIFO_USABLE  (MXC_UART_FIFO_DEPTH - 3)
 
 /* -------------------------------------------------------------------------
  * hal_uart_dma — polling implementation used by btstack_uart_block_embedded
+ * (matches the official BTstack MAX32630FTHR port structure)
  * ------------------------------------------------------------------------- */
-static void (*s_rx_done)(void);
-static void (*s_tx_done)(void);
+static void dummy_handler(void) {}
+static void (*s_rx_done)(void) = dummy_handler;
+static void (*s_tx_done)(void) = dummy_handler;
 static uint8_t *s_rx_buf;
 static int      s_rx_len;
 static uint8_t *s_tx_buf;
 static int      s_tx_len;
 
-void hal_uart_dma_init(void) { s_rx_len = 0; s_tx_len = 0; }
+static uint32_t s_baud_rate;
+
+void hal_uart_dma_init(void)
+{
+    s_rx_len = 0;
+    s_tx_len = 0;
+    hal_uart_dma_set_baud(115200);
+}
 
 int hal_uart_dma_set_baud(uint32_t baud)
 {
+    s_baud_rate = baud;
     const uart_cfg_t cfg = {
         .parity=UART_PARITY_DISABLE, .size=UART_DATA_SIZE_8_BITS,
         .extra_stop=0, .cts=1, .rts=1, .baud=baud,
     };
     const sys_cfg_uart_t sys = {
-        .clk_scale=CLKMAN_SCALE_DIV_1,
+        .clk_scale=CLKMAN_SCALE_AUTO,
         .io_cfg=IOMAN_UART(BLE_UART_ID, IOMAN_MAP_B, IOMAN_MAP_B, IOMAN_MAP_B, 1, 1, 1),
     };
     mxc_uart_regs_t *u = MXC_UART_GET_UART(BLE_UART_ID);
@@ -59,7 +74,10 @@ int hal_uart_dma_set_baud(uint32_t baud)
     /* Active-high CTS/RTS polarity to match CC2564B; RTS deasserts near FIFO full */
     u->ctrl |= MXC_F_UART_CTRL_CTS_POLARITY | MXC_F_UART_CTRL_RTS_POLARITY;
     u->ctrl &= ~MXC_F_UART_CTRL_RTS_LEVEL;
-    u->ctrl |= ((MXC_UART_FIFO_DEPTH - 3u) << MXC_F_UART_CTRL_RTS_LEVEL_POS);
+    u->ctrl |= (UART_RXFIFO_USABLE << MXC_F_UART_CTRL_RTS_LEVEL_POS);
+    console_write("[uart] baud=");
+    console_write_u16dec((uint16_t)(baud / 100));
+    console_write("00\r\n");
     return (int)baud;
 }
 
@@ -68,26 +86,16 @@ void hal_uart_dma_set_block_sent(void (*h)(void))     { s_tx_done = h; }
 void hal_uart_dma_set_csr_irq_handler(void (*h)(void)){ (void)h; }
 void hal_uart_dma_set_sleep(uint8_t s)                { (void)s; }
 
-static uint16_t s_dbg_rx_block_len;
-static uint16_t s_dbg_tx_block_len;
-
 void hal_uart_dma_receive_block(uint8_t *buf, uint16_t len)
 {
     s_rx_buf = buf;
     s_rx_len = (int)len;
-    s_dbg_rx_block_len = len;
 }
 
 void hal_uart_dma_send_block(const uint8_t *buf, uint16_t len)
 {
     s_tx_buf = (uint8_t *)buf;
     s_tx_len = (int)len;
-    s_dbg_tx_block_len = len;
-    if (ble_io_log) {
-        console_write("[send ");
-        console_write_u16dec(len);
-        console_write("]\r\n");
-    }
 }
 
 /* -------------------------------------------------------------------------
@@ -164,12 +172,16 @@ static void pmic_init(void)
  * BTstack opens the HCI transport.
  * ------------------------------------------------------------------------- */
 static const gpio_cfg_t ble_nshutd = {PORT_1, PIN_6, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL};
+static const gpio_cfg_t ble_hcirts = {PORT_0, PIN_3, GPIO_FUNC_GPIO, GPIO_PAD_INPUT_PULLUP};
 
 static void bt_comm_init(void)
 {
     /* BLE UART pins (Port 0/1) use core VDDIO, not VDDIOH */
     MXC_IOMAN->use_vddioh_0 &= ~(PIN_0|PIN_1|PIN_2|PIN_3);
     MXC_IOMAN->use_vddioh_1 &= ~(PIN_6|PIN_7);
+
+    /* Configure HCI RTS as input so we can poll for module ready */
+    GPIO_Config(&ble_hcirts);
 
     /* Start 32.768 kHz nano-ring oscillator — feeds CC2564B slow clock via P1.7 */
     MXC_RTCCFG->clk_ctrl |= MXC_F_RTC_CLK_CTRL_NANO_EN;
@@ -182,79 +194,74 @@ static void bt_comm_init(void)
     GPIO_OutClr(&ble_nshutd);
     TMR_Delay(MXC_TMR0, MSEC(10));
     GPIO_OutSet(&ble_nshutd);
-    TMR_Delay(MXC_TMR0, MSEC(500));
+
+    /* Wait for the module to pull HCI RTS low (ready to receive) */
+    console_write("[boot] waiting for CC2564B RTS...\r\n");
+    while (GPIO_InGet(&ble_hcirts)) { /* spin */ }
+    console_write("[boot] CC2564B ready\r\n");
 }
 
 /* -------------------------------------------------------------------------
  * hal_btstack_run_loop_execute_once — call from main() while(1)
  *
- * Drains TX, drains RX, runs BTstack, then drains TX again.
- * The second TX drain is critical: btstack_run_loop_embedded_execute_once()
- * processes incoming packets and may immediately queue outgoing ACL data
- * (e.g. ATT responses). Without the second drain that TX waits a full extra
- * main-loop iteration, which breaks the ATT request/response timing.
+ * Matches the official BTstack MAX32630FTHR port structure:
+ *   1. Drain RX FIFO → notify BTstack when a block is complete
+ *   2. Drain TX FIFO → notify BTstack when a block is sent
+ *   3. Tick the BTstack embedded run loop
  * ------------------------------------------------------------------------- */
-static void drain_tx(mxc_uart_regs_t *uart)
-{
-    while (s_tx_len > 0) {
-        int avail = UART_NumWriteAvail(uart);
-        if (!avail) break;
-        int n = (s_tx_len < avail) ? s_tx_len : avail;
-        UART_Write(uart, s_tx_buf, n);
-        s_tx_buf += n;
-        s_tx_len -= n;
-        if (s_tx_len == 0 && s_tx_done) {
-            if (ble_io_log) {
-                console_write("[tx ");
-                console_write_u16dec(s_dbg_tx_block_len);
-                console_write("]\r\n");
-            }
-            s_tx_done();
-        }
-    }
-}
-
 void hal_btstack_run_loop_execute_once(void)
 {
     mxc_uart_regs_t *uart = MXC_UART_GET_UART(BLE_UART_ID);
 
-    drain_tx(uart);
-
+    /* Drain RX */
     while (s_rx_len > 0) {
-        int avail = UART_NumReadAvail(uart);
-        if (!avail) break;
-        int n = (s_rx_len < avail) ? s_rx_len : avail;
+        int rx_avail = UART_NumReadAvail(uart);
+        if (!rx_avail) break;
+
+        int n = (s_rx_len < rx_avail) ? s_rx_len : rx_avail;
         int got = 0;
         UART_Read(uart, s_rx_buf, n, &got);
+        if (got <= 0) break;
+
         s_rx_buf += got;
         s_rx_len -= got;
+
         if (s_rx_len <= 0) {
             s_rx_len = 0;
-            if (ble_io_log) {
-                console_write("[rx ");
-                console_write_u16dec(s_dbg_rx_block_len);
-                console_write("]\r\n");
-            }
-            if (s_rx_done) s_rx_done();
+            (*s_rx_done)();
+        }
+    }
+
+    /* Drain TX */
+    while (s_tx_len > 0) {
+        int tx_avail = UART_NumWriteAvail(uart);
+        if (!tx_avail) break;
+
+        int n = (s_tx_len < tx_avail) ? s_tx_len : tx_avail;
+        int ret = UART_Write(uart, s_tx_buf, n);
+        if (ret < 0) break;
+
+        s_tx_buf += n;
+        s_tx_len -= n;
+
+        if (s_tx_len <= 0) {
+            s_tx_len = 0;
+            (*s_tx_done)();
         }
     }
 
     btstack_run_loop_embedded_execute_once();
-
-    /* Drain TX queued by BTstack in the run loop above — avoids one extra
-     * iteration of latency between ATT request and ATT response.         */
-    drain_tx(uart);
 }
 
 /* -------------------------------------------------------------------------
- * HCI transport config — 115200 baud, no post-init baud change
- * The .bts-derived init script has the baud-change command stripped out.
+ * HCI transport config — 115200 init, renegotiate to 4 Mbps after init
+ * Hardware CTS/RTS flow control enabled.
  * ------------------------------------------------------------------------- */
 static const hci_transport_config_uart_t hci_cfg = {
     HCI_TRANSPORT_CONFIG_UART,
-    115200, /* baudrate_init */
-    0,      /* baudrate_main: stay at 115200 */
-    0,      /* flowcontrol field (H/W CTS/RTS already configured) */
+    115200,   /* baudrate_init */
+    4000000,  /* baudrate_main — renegotiate after CC256X init */
+    1,        /* flowcontrol: hardware CTS/RTS */
     NULL,
 };
 

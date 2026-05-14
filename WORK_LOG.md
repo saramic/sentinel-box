@@ -51,6 +51,55 @@
 
 ## Thu 14 May 2026
 
+### Back to the official port structure
+
+The first cut of `port/btstack_port.c` was a hand-rolled polling HAL with
+a custom `drain_tx()` helper called twice per loop iteration — once before and
+once after `btstack_run_loop_embedded_execute_once()`. The rationale was that
+ATT responses queued during packet processing needed to be flushed immediately
+or Web Bluetooth would time out. It worked, but it was over-engineered:
+
+```c
+// OLD: double-drain pattern
+drain_tx(uart);       // flush pending TX
+drain_rx(uart);       // pull in HCI events
+btstack_run_loop_embedded_execute_once();
+drain_tx(uart);       // flush responses queued above
+```
+
+Looking at the official BTstack port for this board
+(`third_party/btstack/port/max32630-fthr/src/btstack_port.c`) it uses the same
+cooperative polling approach — **not** interrupt-driven DMA — but with a simpler
+single-pass structure: RX drain → TX drain → run loop tick. That's it. The
+official port trusts that the next iteration of the tight `while(1)` loop is
+fast enough to service TX before any timeout fires, and it is.
+
+Switching to match the official structure also let me:
+
+1. **Enable baud rate renegotiation** — `baudrate_main = 4000000`. The CC256X
+   init script includes a baud-change vendor command; BTstack sends it
+   automatically when `baudrate_main != 0`. Running at 4 Mbps (vs 115200)
+   means HCI packets transfer ~35× faster, which is especially noticeable
+   during the ~150-command service pack upload at boot.
+
+2. **Poll HCI RTS for module readiness** — instead of a blind 500 ms
+   `TMR_Delay` after releasing nSHUTD, the port now spins on P0.3 (the
+   CC2564B's RTS output) until it goes low. This matches what the official port
+   does and shaves a few hundred milliseconds off boot when the module is
+   already warm.
+
+3. **Set `flowcontrol = 1`** in the HCI config struct — tells BTstack that
+   hardware CTS/RTS is available. The old code set it to 0 and relied on the
+   UART peripheral's CTS gating alone; explicitly declaring it lets BTstack
+   skip software flow-control workarounds.
+
+4. **Use `CLKMAN_SCALE_AUTO`** — required for the UART peripheral to derive a
+   valid baud divisor at 4 MHz. The old `CLKMAN_SCALE_DIV_1` forced the
+   peripheral clock to system clock ÷1 which only works up to ~1 Mbps.
+
+The result is simpler code (no `drain_tx` helper, no debug-logging in the HAL
+layer) that matches the reference implementation and runs faster.
+
 ### From Raw HCI to BTstack — a Proper BLE Stack
 
 Yesterday's `experiments/in_bluetooth` got advertising working by hand-rolling
