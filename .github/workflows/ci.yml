@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'sentinel-console/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'sentinel-console/**'
+      - '.github/workflows/ci.yml'
+
+jobs:
+  check:
+    name: Lint, format & test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sentinel-console
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: sentinel-console/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check (lint + format + tests)
+        run: pnpm run check
