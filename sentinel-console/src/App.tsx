@@ -1,7 +1,7 @@
 // Register the Lit web component before React renders
 import "./ble/SentinelBleManager"
 import { useRef } from "react"
-import { BleProvider, useSentinelBle } from "./ble/useSentinelBle"
+import { BleProvider } from "./ble/useSentinelBle"
 import type { SentinelBleManager } from "./ble/SentinelBleManager"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AppHeader } from "@/components/AppHeader"
@@ -10,8 +10,6 @@ import { SetupTab } from "@/components/SetupTab"
 import { DebugTab } from "@/components/DebugTab"
 
 function AppShell() {
-  const { connected } = useSentinelBle()
-
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeader />
@@ -20,12 +18,8 @@ function AppShell() {
         <Tabs defaultValue="connect" className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="connect">Connect</TabsTrigger>
-            <TabsTrigger value="setup" disabled={!connected}>
-              Setup
-            </TabsTrigger>
-            <TabsTrigger value="debug" disabled={!connected}>
-              Debug
-            </TabsTrigger>
+            <TabsTrigger value="setup">Setup</TabsTrigger>
+            <TabsTrigger value="debug">Debug</TabsTrigger>
           </TabsList>
 
           <TabsContent value="connect">
