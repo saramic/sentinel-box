@@ -28,5 +28,11 @@ export default defineConfig([
     rules: {
       "react-refresh/only-export-components": "off",
     },
+  }, // BLE layer mixes context provider, hook, and helpers in one module.
+  {
+    files: ["src/ble/**"],
+    rules: {
+      "react-refresh/only-export-components": "off",
+    },
   },
 ])

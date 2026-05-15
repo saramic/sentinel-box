@@ -8,17 +8,17 @@ import tailwindcss from "@tailwindcss/vite"
 export default defineConfig({
   plugins: [
     react(),
-    babel({ presets: [reactCompilerPreset()] }),
+    // React Compiler via Babel — exclude Lit web component files that use
+    // TypeScript decorators, which Babel cannot parse without extra plugins.
+    babel({
+      presets: [reactCompilerPreset()],
+      exclude: ["**/ble/**"],
+    }),
     tailwindcss(),
   ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-  },
-  test: {
-    environment: "jsdom",
-    globals: true,
-    setupFiles: ["./src/test-setup.ts"],
   },
 })
