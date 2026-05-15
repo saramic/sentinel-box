@@ -409,3 +409,5 @@ run = "python3 -m http.server 8080"
 [tools]
 ruby = "3.2.2"
 python = "3.11"
+node = "22"
+pnpm = "latest"
