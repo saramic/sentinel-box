@@ -4,6 +4,8 @@ Element 14 Design Challenge
 
 - [https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance](https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance)
 
+[![CI](https://github.com/saramic/sentinel-box/actions/workflows/ci.yml/badge.svg)](https://github.com/saramic/sentinel-box/actions/workflows/ci.yml)
+
 # SentinelBox: Smart Secure Storage for Families
 
 SentinelBox — Intelligent Device Lockbox Powered by MAX32630FTHR
