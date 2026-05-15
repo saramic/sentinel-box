@@ -80,12 +80,15 @@ export class SentinelBleManager extends LitElement {
    * Open the browser BLE scan dialog and connect to a SentinelBox device.
    * Fires `sentinel-connected` on success, `sentinel-error` on failure.
    */
-  async connect(): Promise<void> {
+  async connect(acceptAll = false): Promise<void> {
     try {
-      const device = await navigator.bluetooth.requestDevice({
-        filters: [{ name: "SentinelBox" }],
-        optionalServices: [SERVICE_UUID],
-      })
+      const requestOptions: RequestDeviceOptions = acceptAll
+        ? { acceptAllDevices: true, optionalServices: [SERVICE_UUID] }
+        : {
+            filters: [{ namePrefix: "SentinelBox" }],
+            optionalServices: [SERVICE_UUID],
+          }
+      const device = await navigator.bluetooth.requestDevice(requestOptions)
 
       device.addEventListener("gattserverdisconnected", () =>
         this._handleDisconnect(),

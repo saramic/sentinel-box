@@ -1,25 +1,11 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { ConnectionPanel } from "@/components/connection/ConnectionPanel"
+import { DeviceStateCard } from "@/components/connection/DeviceStateCard"
 
 export function ConnectTab() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Connect to SentinelBox</CardTitle>
-        <CardDescription>
-          Pair with a nearby SentinelBox device over Bluetooth.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">
-          Connection panel — coming in Phase 4.
-        </p>
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-4 max-w-lg">
+      <ConnectionPanel />
+      <DeviceStateCard />
+    </div>
   )
 }

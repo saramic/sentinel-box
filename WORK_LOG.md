@@ -49,6 +49,117 @@
 
 ---
 
+## Fri 15 May 2026
+
+attempting to move forward with the final frontend configuration
+
+
+Plan: SentinelBox Console Web App
+TL;DR: Build sentinel-console/ at the project root as a Vite + React +
+shadcn/ui single-page app. The key tension is that shadcn/ui is React-first
+while web components are framework-agnostic — the solution is to use Lit
+(Google's 5KB web components library) for two specific pieces: the BLE hardware
+abstraction layer and the debug terminal. Lit components plug natively into
+React. You get real web components education and real shadcn/ui usage.
+
+### Steps
+
+#### Phase 1 — Scaffold
+
+1. Create sentinel-console/ at the project root with Vite + React + TypeScript
+   template
+1. Add Tailwind CSS via @tailwindcss/vite plugin
+1. Run shadcn@latest init — sets up components.json, aliases, base CSS
+   variables
+1. Run pnpm add lit — Lit is the standard web components framework (~5KB), no
+   extra build config needed
+1. Add shadcn/ui components via CLI: button card tabs badge progress input
+   select switch separator alert slider scroll-area
+
+#### Phase 2 — BLE Web Component + Hook
+
+1. src/ble/gatt.ts — UUID constants (0xF001–0xF014), command byte enums, a
+   typed BleCharacteristic helper (read/write/subscribe with ArrayBuffer ↔
+   typed value conversions)
+1. src/ble/SentinelBleManager.ts (Lit LitElement, registered as
+   <sentinel-ble-manager>) — encapsulates all Web Bluetooth API calls; fires
+   custom events: sentinel-connected, sentinel-disconnected,
+   sentinel-state-change, sentinel-gatt-notify; exposes methods: connect(),
+   disconnect(), readCharacteristic(uuid), writeCharacteristic(uuid, value).
+   This is the genuine web component.
+1. src/ble/useSentinelBle.ts — React hook that holds a ref to the
+   <sentinel-ble-manager> element, listens to its custom events via
+   addEventListener, and returns typed state + command functions to the rest of
+   the React tree
+1. src/ble/config-codec.ts — encodeConfig(cfg) → Uint8Array and
+   decodeConfig(buf) → typed object, matching the 100-byte INFO flash layout
+   from README; crc16ccitt() pure function
+1. Mount <sentinel-ble-manager> once in App.tsx; wrap with a BleContext
+   provider
+
+#### Phase 3 — App Shell
+
+1. src/App.tsx — persistent header ("SentinelBox Console", connection Badge,
+   device name) + shadcn Tabs with three tabs: Connect, Setup, Debug
+1. Tabs are disabled when not connected (except Connect)
+
+#### Phase 4 — Connect Tab
+
+1. ConnectionPanel.tsx — "Pair Device" Button (shows Loader2 spinner while
+   scanning); once connected shows "Disconnect" danger button. Reads 0xF001 on
+   connect to seed initial state.
+1. DeviceStateCard.tsx — Card showing current firmware state name, matching LED
+   colour dot (CSS colour from state enum), and state description; updates live
+   from sentinel-state-change events
+
+HERE I ran into some problems, cannot seem to set the new service at FF00
+
+and also cannot seem to easily disconnect or forge the device in chrome?
+
+- chrome://bluetooth-internals/#devices find devices and GATT
+- chrome://device-log/ a log of things like bluetooth
+- chrome://flags/#enable-web-bluetooth-new-permissions-backend
+  - Use the new permissions backend for Web Bluetooth changed from DEFAULT to
+    ENABLED and that seems it allows me to disconnect but is more strict so
+    changed back
+
+#### Phase 5 — Setup Tab (Wizard)
+
+1. SetupWizard.tsx — shadcn Progress bar (4 steps), step router; validates at
+   each step before allowing advance; "Back" / "Next" navigation
+1. VaultCalibrationStep.tsx (Step 1) — large step-count display; sends
+   CMD_SETUP_VAULT to 0xF010 on enter; four Buttons: −100 / −10 / +10 / +100
+   each write updated value to 0xF011; "Test Return" drives motor home;
+   "Confirm" advances wizard
+1. FingerprintStep.tsx (Step 2) — 10-slot grid; each slot: slot badge, 8-char
+   Input for name, Switch for Adult/Child role, "Enrol" Button; enrolment
+   drives a 3-step scan sequence (polling 0xF001), showing SCAN → LIFT → SCAN →
+   OK/RETRY feedback inline; slot status badge (empty / enrolled / failed);
+   requires ≥ 1 Adult to advance
+1. PolicyStep.tsx (Step 3) — Select for unlock policy (Any / 1 Adult / 1
+   Adult+1 Child / 2 Adults); Select for auto-relock (5 min / 10 min / 30 min /
+   Never); shows Alert warning if selected policy exceeds enrolled adult count
+1. ConfirmStep.tsx (Step 4) — summary Card showing all values; "Write to
+   Device" button encodes config via config-codec.ts, sends to 0xF014; shows
+   success/failure Alert; on success transitions device to Armed state
+
+#### Phase 6 — Debug Tab
+
+1. GattExplorer.tsx — expandable list of all 7 characteristics; each shows
+   UUID, name, properties; "Read" button shows current hex + decoded value;
+   writable ones show hex Input + "Write" button; 0xF001 has a "Subscribe"
+   Switch for live notifications
+1. LedOverrideCard.tsx — six colour Buttons (Off / Red / Green / Blue / Cyan /
+   White) with coloured dot; writes the matching byte to 0xF002
+1. src/components/terminal/SentinelTerminal.ts (Lit LitElement,
+   <sentinel-terminal>) — web component #2; shadow DOM with a scrolling
+   terminal panel; log(msg, level) method; colour levels: tx (blue) / rx
+   (purple) / ok (green) / warn (amber) / error (red) — matches the palette in
+   ble_debug.html; max-lines attribute; "Clear" and auto-scroll toggle buttons
+   inside shadow DOM
+1. SentinelTerminal.tsx — thin React ref wrapper that passes all BLE events
+   from useSentinelBle into the web component's log() method
+
 ## Thu 14 May 2026
 
 ### Back to the official port structure

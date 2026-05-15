@@ -35,7 +35,7 @@ export interface BleContextValue {
   deviceName: string
   deviceState: DeviceState
   lastError: string | null
-  connect: () => Promise<void>
+  connect: (acceptAll?: boolean) => Promise<void>
   disconnect: () => Promise<void>
   readChar: (uuid: number) => Promise<DataView | null>
   writeChar: (uuid: number, value: Uint8Array | number) => Promise<void>
@@ -102,7 +102,8 @@ export function BleProvider({ managerRef, children }: BleProviderProps) {
   }, [managerRef])
 
   const connect = useCallback(
-    () => managerRef.current?.connect() ?? Promise.resolve(),
+    (acceptAll?: boolean) =>
+      managerRef.current?.connect(acceptAll) ?? Promise.resolve(),
     [managerRef],
   )
 
