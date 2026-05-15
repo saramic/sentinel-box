@@ -1,15 +1,15 @@
 /**
  * GATT service and characteristic UUIDs for the SentinelBox BLE server.
  *
- * All custom characteristics live under service 0xFF00.
+ * SERVICE_UUID is currently 0xF001 to match the in_btstack experiment firmware.
  * The 16-bit short UUIDs are promoted to full 128-bit Bluetooth base UUIDs
  * by the Web Bluetooth API automatically when passed as numbers.
  */
 
 // ── Service ──────────────────────────────────────────────────────────────────
 
-/** Custom SentinelBox GATT service */
-export const SERVICE_UUID = 0xff00
+/** Custom SentinelBox GATT service (0xF001 in current firmware) */
+export const SERVICE_UUID = 0xf001
 
 // ── Characteristic UUIDs ─────────────────────────────────────────────────────
 

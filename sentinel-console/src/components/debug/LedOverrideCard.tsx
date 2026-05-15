@@ -25,16 +25,6 @@ const LED_BUTTONS: Array<{ label: string; value: LedColor; style: string }> = [
     value: LedColor.Blue,
     style: "bg-blue-700 text-white hover:bg-blue-600",
   },
-  {
-    label: "Cyan",
-    value: LedColor.Cyan,
-    style: "bg-cyan-600 text-white hover:bg-cyan-500",
-  },
-  {
-    label: "White",
-    value: LedColor.White,
-    style: "bg-zinc-100 text-zinc-900 hover:bg-white",
-  },
 ]
 
 export function LedOverrideCard() {

@@ -12,6 +12,7 @@ import {
   CHAR_FP_SLOT,
   CHAR_FP_METADATA,
   CHAR_CONFIG_BLOB,
+  LedColor,
 } from "@/ble/gatt"
 
 interface CharDef {
@@ -143,6 +144,48 @@ function CharRow({ def }: { def: CharDef }) {
         )}
         {error && <span className="text-xs text-destructive">{error}</span>}
       </div>
+      {/* LED quick-write shortcuts for the LED Override characteristic */}
+      {def.uuid === CHAR_LED_OVERRIDE && (
+        <div className="flex gap-1 mt-1 flex-wrap">
+          {(
+            [
+              {
+                label: "Off",
+                color: LedColor.Off,
+                cls: "bg-zinc-700 hover:bg-zinc-600 text-zinc-200",
+              },
+              {
+                label: "Red",
+                color: LedColor.Red,
+                cls: "bg-red-700 hover:bg-red-600 text-white",
+              },
+              {
+                label: "Green",
+                color: LedColor.Green,
+                cls: "bg-green-700 hover:bg-green-600 text-white",
+              },
+              {
+                label: "Blue",
+                color: LedColor.Blue,
+                cls: "bg-blue-700 hover:bg-blue-600 text-white",
+              },
+            ] as Array<{ label: string; color: LedColor; cls: string }>
+          ).map(({ label, color, cls }) => (
+            <button
+              key={label}
+              disabled={!connected || busy}
+              onClick={async () => {
+                setBusy(true)
+                await writeChar(def.uuid, color)
+                setBusy(false)
+              }}
+              className={`px-3 py-0.5 rounded text-xs font-medium transition-opacity disabled:opacity-40 disabled:cursor-not-allowed ${cls}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

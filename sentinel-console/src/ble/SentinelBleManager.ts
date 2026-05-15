@@ -85,8 +85,9 @@ export class SentinelBleManager extends LitElement {
       const requestOptions: RequestDeviceOptions = acceptAll
         ? { acceptAllDevices: true, optionalServices: [SERVICE_UUID] }
         : {
-            filters: [{ namePrefix: "SentinelBox" }],
-            optionalServices: [SERVICE_UUID],
+            // Filter by advertised service UUID — Chrome grants access when
+            // the service appears in both filters and the advertisement packet.
+            filters: [{ services: [SERVICE_UUID] }],
           }
       const device = await navigator.bluetooth.requestDevice(requestOptions)
 
