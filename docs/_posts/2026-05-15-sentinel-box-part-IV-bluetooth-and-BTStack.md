@@ -327,8 +327,8 @@ on the board.
 <img src="/sentinel-box/assets/20260514_BLE_demo_simple.gif"
   alt="BLE control via Chrome browser changes LED colour" width="740" />
 
-shows that changes on the Chrome page change the LED colour: `01` — RED, `02` —
-GREEN, `03` — BLUE.
+shows that changes on the Chrome page change the LED colour: `01` — RED 🔴, `02` —
+GREEN 🟢, `03` — BLUE 🔵.
 
 <video width="740" controls>
   <source src="/sentinel-box/assets/20260514_BLE_demo.mp4" type="video/mp4">
