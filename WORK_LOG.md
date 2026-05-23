@@ -49,6 +49,14 @@
 
 ---
 
+## Sat 16 May 2026
+
+Given the below `FF00` channel seems not to work, added the `FF01` implemented
+feature which allows for LED turn on/off and that works
+
+**NEXT:** probably to add other features to that and some more functionality but
+in a new real ./src builld for the project
+
 ## Fri 15 May 2026
 
 attempting to move forward with the final frontend configuration
