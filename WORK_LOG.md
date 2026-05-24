@@ -54,6 +54,23 @@
 - started on a final build of the project in `src/main.c`
 - RGB read/write via **sentinel-console**
 
+- other peoples projects
+  - https://github.com/arvindsa/identity-protocol-e14-challenge
+  - https://github.com/alistairuk/dont-forget-to-set
+- other top final projects
+  - https://community.element14.com/challenges-projects/design-challenges/design-for-a-cause-2021/b/blog/posts/blog-5---testing
+  - https://community.element14.com/challenges-projects/design-challenges/w/documents/27408/design-challenger-of-the-year-2021
+  - https://community.element14.com/challenges-projects/design-challenges/smart-security-and-surveillance/b/projects/posts/don-t-forget-to-set---project-overview-1102846768
+
+Also that pesky FFMPEG with iPhone encoding requires `-pix_fmt yuv420p`
+
+```
+ffmpeg -i ~/local_documents/20260514_BLE_demo.mov -i \
+  ~/Projects/saramic/ham-radio/electronics/game/soundtrack.mp3 -af "atempo=1.0" -map 0:v -map 1:a \
+  -shortest -vf "setpts=PTS/2,setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709" -c:v libx264 \
+  -crf 23 -preset fast -c:a aac -b:a 128k -pix_fmt yuv420p -movflags +faststart 20260514_BLE_demo.mp4
+```
+
 ### On construction
 
 - my perspex construction is not up to spec
