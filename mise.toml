@@ -30,7 +30,7 @@ run = "rm -rf .pio/build"
 [tasks.build]
 description = "build"
 run = """
-    pio run -e in_blink_mbed
+    mise run build:sentinel_box
 """
 
 [tasks.upload]
@@ -415,6 +415,39 @@ run = """
 description = "serve BTstack BLE debug page at http://localhost:8080/ble_debug.html"
 dir = "experiments/in_btstack"
 run = "python3 -m http.server 8080"
+
+#
+# Final build - sentinel box - LPSDK 🅲
+#
+[tasks."cbu:sentinel_box"]
+description = "clean-build-upload sentinel box"
+run = """
+  mise run clean:sentinel_box
+  mise run build:sentinel_box
+  mise run upload:sentinel_box
+"""
+
+[tasks."clean:sentinel_box"]
+description = "clean sentinel box"
+dir = "src"
+run = "make clean"
+
+[tasks."build:sentinel_box"]
+description = "build sentinel box firmware"
+dir = "src"
+run = "make"
+
+[tasks."upload:sentinel_box"]
+description = "upload sentinel box firmware"
+dir = "src"
+run = """
+    openocd \
+        -s /usr/local/share/openocd/scripts \
+        -f interface/cmsis-dap.cfg \
+        -f target/max3263x.cfg \
+        -c 'reset_config srst_only' \
+        -c 'program build/sentinel_box.elf verify reset exit'
+"""
 
 [tools]
 ruby = "3.2.2"
