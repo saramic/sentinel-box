@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,7 +29,7 @@ const CHARS: CharDef[] = [
   },
   { uuid: CHAR_LED_OVERRIDE, name: "LED Override", props: ["read", "write"] },
   { uuid: CHAR_SETUP_CMD, name: "Setup Command", props: ["write"] },
-  { uuid: CHAR_VAULT_STEPS, name: "Vault Steps", props: ["read", "write"] },
+  { uuid: CHAR_VAULT_STEPS, name: "Vault Steps", props: ["read", "write", "notify"] },
   { uuid: CHAR_FP_SLOT, name: "FP Slot", props: ["read", "write"] },
   { uuid: CHAR_FP_METADATA, name: "FP Metadata", props: ["read", "write"] },
   { uuid: CHAR_CONFIG_BLOB, name: "Config Blob", props: ["write"] },
@@ -59,11 +59,26 @@ function parseHexInput(s: string): Uint8Array | null {
 }
 
 function CharRow({ def }: { def: CharDef }) {
-  const { connected, readChar, writeChar } = useSentinelBle()
+  const { connected, readChar, writeChar, subscribe } = useSentinelBle()
   const [value, setValue] = useState<string | null>(null)
   const [writeInput, setWriteInput] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [subscribed, setSubscribed] = useState(false)
+
+  useEffect(() => {
+    if (!def.props.includes("notify")) return
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ uuid: number; value: DataView }>).detail
+      if (detail.uuid === def.uuid) setValue(dataViewToHex(detail.value))
+    }
+    document.addEventListener("sentinel-gatt-notify", handler)
+    return () => document.removeEventListener("sentinel-gatt-notify", handler)
+  }, [def.uuid, def.props])
+
+  useEffect(() => {
+    if (!connected) setSubscribed(false)
+  }, [connected])
 
   async function handleRead() {
     if (!connected || busy) return
@@ -115,6 +130,20 @@ function CharRow({ def }: { def: CharDef }) {
             onClick={handleRead}
           >
             Read
+          </Button>
+        )}
+        {def.props.includes("notify") && (
+          <Button
+            size="sm"
+            variant={subscribed ? "default" : "outline"}
+            className="h-7 text-xs"
+            disabled={!connected || subscribed}
+            onClick={async () => {
+              await subscribe(def.uuid)
+              setSubscribed(true)
+            }}
+          >
+            {subscribed ? "Subscribed" : "Subscribe"}
           </Button>
         )}
         {value !== null && (

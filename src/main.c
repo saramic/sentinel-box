@@ -73,6 +73,69 @@ static void led_apply(uint8_t v)
     }
 }
 
+/* ---- 28BYJ-48 stepper via ULN2003 — P5.2=IN1 P5.1=IN2 P5.0=IN3 P4.0=IN4 --- */
+static const gpio_cfg_t s_in1 = {PORT_5, PIN_2, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL};
+static const gpio_cfg_t s_in2 = {PORT_5, PIN_1, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL};
+static const gpio_cfg_t s_in3 = {PORT_5, PIN_0, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL};
+static const gpio_cfg_t s_in4 = {PORT_4, PIN_0, GPIO_FUNC_GPIO, GPIO_PAD_NORMAL};
+
+static const uint8_t s_half[8][4] = {
+    {1,0,0,0}, {1,1,0,0}, {0,1,0,0}, {0,1,1,0},
+    {0,0,1,0}, {0,0,1,1}, {0,0,0,1}, {1,0,0,1},
+};
+static int      s_step_idx  = 0;
+static int32_t  s_current   = 0;   /* absolute position in half-steps */
+static int32_t  s_target    = 0;
+static uint32_t s_last_ms   = 0;
+#define STEPPER_STEP_MS  3         /* 2944µs ≈ 3ms per half-step at 5 RPM */
+
+static void stepper_init(void)
+{
+    GPIO_Config(&s_in1); GPIO_OutClr(&s_in1);
+    GPIO_Config(&s_in2); GPIO_OutClr(&s_in2);
+    GPIO_Config(&s_in3); GPIO_OutClr(&s_in3);
+    GPIO_Config(&s_in4); GPIO_OutClr(&s_in4);
+}
+
+static void stepper_apply(void)
+{
+    const uint8_t *s = s_half[s_step_idx];
+    s[0] ? GPIO_OutSet(&s_in1) : GPIO_OutClr(&s_in1);
+    s[1] ? GPIO_OutSet(&s_in2) : GPIO_OutClr(&s_in2);
+    s[2] ? GPIO_OutSet(&s_in3) : GPIO_OutClr(&s_in3);
+    s[3] ? GPIO_OutSet(&s_in4) : GPIO_OutClr(&s_in4);
+}
+
+/* ---- Connection state for notifications ---------------------------------- */
+static hci_con_handle_t s_con_handle      = HCI_CON_HANDLE_INVALID;
+static uint8_t          s_steps_notify    = 0;
+static uint8_t          s_notify_pending  = 0;
+
+/* ---- Non-blocking stepper tick — call from main while(1) ----------------- */
+static void stepper_tick(void)
+{
+    if (s_current == s_target) return;
+    uint32_t now = hal_time_ms();
+    if (now - s_last_ms < STEPPER_STEP_MS) return;
+    s_last_ms = now;
+
+    int dir = (s_target > s_current) ? 1 : -1;
+    s_step_idx = (s_step_idx + dir + 8) % 8;
+    stepper_apply();
+    s_current += dir;
+
+    if (s_current == s_target || (s_current % 10) == 0) {
+        console_write("[step] pos=");
+        console_write_u16dec((uint16_t)(s_current < 0 ? 0 : s_current));
+        console_write("\r\n");
+    }
+
+    if (s_steps_notify && s_con_handle != HCI_CON_HANDLE_INVALID && !s_notify_pending) {
+        s_notify_pending = 1;
+        att_server_request_can_send_now_event(s_con_handle);
+    }
+}
+
 /* ---- Advertising payload ------------------------------------------------- */
 static const uint8_t adv_data[] = {
     0x02, 0x01, 0x06,
@@ -99,6 +162,9 @@ static void packet_handler(uint8_t type, uint16_t ch, uint8_t *pkt, uint16_t sz)
         break;
     case HCI_EVENT_DISCONNECTION_COMPLETE:
         console_write("[ble] disconnected\r\n");
+        s_con_handle   = HCI_CON_HANDLE_INVALID;
+        s_steps_notify = 0;
+        s_notify_pending = 0;
         ble_io_log = 0;
         gap_advertisements_enable(1);
         led_apply(2);   /* green = advertising again */
@@ -106,8 +172,18 @@ static void packet_handler(uint8_t type, uint16_t ch, uint8_t *pkt, uint16_t sz)
     case HCI_EVENT_LE_META:
         if (hci_event_le_meta_get_subevent_code(pkt) == HCI_SUBEVENT_LE_CONNECTION_COMPLETE) {
             console_write("[ble] connected\r\n");
+            s_con_handle = hci_subevent_le_connection_complete_get_connection_handle(pkt);
             ble_io_log = 1;
             led_apply(3);   /* blue = connected */
+        }
+        break;
+    case ATT_EVENT_CAN_SEND_NOW:
+        if (s_notify_pending) {
+            s_notify_pending = 0;
+            uint8_t val[2] = { (uint8_t)s_current, (uint8_t)(s_current >> 8) };
+            att_server_notify(s_con_handle,
+                ATT_CHARACTERISTIC_0000F011_0000_1000_8000_00805F9B34FB_01_VALUE_HANDLE,
+                val, 2);
         }
         break;
     default:
@@ -120,14 +196,13 @@ static uint16_t att_read_handler(hci_con_handle_t h, uint16_t att_h, uint16_t of
                                  uint8_t *buf, uint16_t buf_size)
 {
     UNUSED(h); UNUSED(offset); UNUSED(buf_size);
-    console_write("[att] read att_h=0x");
-    console_write_u8hex((uint8_t)(att_h >> 8));
-    console_write_u8hex((uint8_t)att_h);
-    console_write(buf ? " phase=data" : " phase=size");
-    console_write("\r\n");
     if (att_h == ATT_CHARACTERISTIC_0000F002_0000_1000_8000_00805F9B34FB_01_VALUE_HANDLE) {
         if (buf) buf[0] = led_value;
         return 1;
+    }
+    if (att_h == ATT_CHARACTERISTIC_0000F011_0000_1000_8000_00805F9B34FB_01_VALUE_HANDLE) {
+        if (buf) { buf[0] = (uint8_t)s_current; buf[1] = (uint8_t)(s_current >> 8); }
+        return 2;
     }
     return 0;
 }
@@ -138,8 +213,19 @@ static int att_write_handler(hci_con_handle_t h, uint16_t att_h, uint16_t mode,
 {
     UNUSED(h); UNUSED(mode); UNUSED(offset);
     if (att_h == ATT_CHARACTERISTIC_0000F002_0000_1000_8000_00805F9B34FB_01_VALUE_HANDLE
-            && len >= 1)
+            && len >= 1) {
         led_apply(buf[0]);
+    } else if (att_h == ATT_CHARACTERISTIC_0000F011_0000_1000_8000_00805F9B34FB_01_VALUE_HANDLE
+            && len >= 2) {
+        s_target = (int32_t)(buf[0] | ((uint16_t)buf[1] << 8));
+        console_write("[step] target=");
+        console_write_u16dec((uint16_t)s_target);
+        console_write("\r\n");
+    } else if (att_h == ATT_CHARACTERISTIC_0000F011_0000_1000_8000_00805F9B34FB_01_CLIENT_CONFIGURATION_HANDLE
+            && len >= 2) {
+        s_steps_notify = buf[0] & 0x01;
+        console_write(s_steps_notify ? "[step] notify on\r\n" : "[step] notify off\r\n");
+    }
     return 0;
 }
 
@@ -150,6 +236,7 @@ int main(void)
     console_write("[main] run loop\r\n");
     while (1) {
         hal_btstack_run_loop_execute_once();
+        stepper_tick();
     }
     return 0;
 }
@@ -160,6 +247,7 @@ int btstack_main(int argc, const char *argv[])
     UNUSED(argc); UNUSED(argv);
 
     led_init();
+    stepper_init();
     led_apply(3);   /* blue = initialising */
 
     l2cap_init();

@@ -15,4 +15,7 @@ void hal_btstack_run_loop_execute_once(void);
 /* Set to 1 from packet_handler after LE connect to trace BLE UART I/O. */
 extern volatile uint8_t ble_io_log;
 
+/* Millisecond wall-clock driven by 1 kHz SysTick — use for non-blocking delays. */
+uint32_t hal_time_ms(void);
+
 #endif
