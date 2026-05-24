@@ -49,6 +49,31 @@
 
 ---
 
+## Sun 24 May 2026
+
+- started on a final build of the project in `src/main.c`
+- RGB read/write via **sentinel-console**
+
+### On construction
+
+- my perspex construction is not up to spec
+- saw some great ideas in
+- plexi glass gears - some good ideas
+  https://woodgears.ca/reader/walters/plexiglass_gears.html
+- design software for gears https://woodgears.ca/gear/index.html
+- more resources https://woodgears.ca/gear_cutting/jig.html
+- cut, file, sand, polish - with car cut/polish to get nice side finish
+  **HOW TO CUT + FINISH PERSPEX ACRYLIC EGDE w HAND TOOLS - amstudio**
+  [![
+    HOW TO CUT + FINISH PERSPEX ACRYLIC EGDE w HAND TOOLS - amstudio
+  ](http://img.youtube.com/vi/aLohcEFa850/0.jpg)](https://youtu.be/aLohcEFa850)
+
+- DIY acrylic bending machine
+  **HOW TO MAKE Acrylic bending machine - Daniele Tartaglia**
+  [![
+    HOW TO MAKE Acrylic bending machine - Daniele Tartaglia
+  ](http://img.youtube.com/vi/mt4qJ96Pxj8/0.jpg)](https://youtu.be/mt4qJ96Pxj8)
+
 ## Sat 16 May 2026
 
 Given the below `FF00` channel seems not to work, added the `FF01` implemented
