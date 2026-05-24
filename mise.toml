@@ -419,6 +419,11 @@ run = "python3 -m http.server 8080"
 #
 # Final build - sentinel box - LPSDK 🅲
 #
+[tasks."generate:sentinel_box"]
+description = "generate cc256x_init_script.c from TI .bts files (one-time setup)"
+dir = "src"
+run = "make generate"
+
 [tasks."cbu:sentinel_box"]
 description = "clean-build-upload sentinel box"
 run = """

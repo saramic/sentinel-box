@@ -10,6 +10,22 @@ Element 14 Design Challenge
 
 SentinelBox — Intelligent Device Lockbox Powered by MAX32630FTHR
 
+## TL;DR
+
+```sh
+mise run install
+
+# run localhost Bluetooth configurator - Chrome
+cd sentinel-console
+npm install
+npm run dev
+open http://localhost:5173/
+
+# install on MAX32630FTHR
+mise run generate:sentinel_box
+mise run cbu:sentinel_box
+```
+
 ## Blog
 
 [https://saramic.github.io/sentinel-box/](https://saramic.github.io/sentinel-box/)
