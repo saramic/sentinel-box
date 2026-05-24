@@ -38,3 +38,9 @@ brew "certifi"                # Mozilla CA bundle for Python
 #                               # to `python3`, `python3-config`, `pip3` etc.,
 #                               # respectively, are installed into
 #                               # /opt/homebrew/opt/python@3.14/libexec/bin
+
+#
+# general dependencies
+#
+brew "tio"                      # Simple TTY terminal I/O application
+                                # https://tio.github.io

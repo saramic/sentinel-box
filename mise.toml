@@ -332,8 +332,18 @@ run = """
 """
 
 [tasks."serial"]
-# quit screen with CTRL-A K
+# quit tio with CTRL-T Q
 description = "open serial monitor for UART1 debug output (115200 baud)"
+run = """
+  PORT=$(ls /dev/tty.usbmodem* 2>/dev/null | head -1)
+  if [ -z "$PORT" ]; then echo "No usbmodem port found"; exit 1; fi
+  echo "Opening $PORT at 115200"
+  tio -b 115200 "$PORT"
+"""
+
+[tasks."serial-screen"]
+# quit screen with CTRL-A K
+description = "open serial monitor (screen) for UART1 debug output (115200 baud)"
 run = """
   PORT=$(ls /dev/tty.usbmodem* 2>/dev/null | head -1)
   if [ -z "$PORT" ]; then echo "No usbmodem port found"; exit 1; fi
